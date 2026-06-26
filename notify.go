@@ -407,6 +407,17 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 				},
 			},
 		},
+		"SubagentStop": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-subagent-done`,
+					},
+				},
+			},
+		},
 		"Stop": []interface{}{
 			map[string]interface{}{
 				"matcher": "",

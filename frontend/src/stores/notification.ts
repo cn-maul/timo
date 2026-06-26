@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { Notification } from '../../bindings/timo/models'
 
 const DONE_CLEAR_DELAY = 5000
-const IDLE_TIMEOUT = 30000
 const ATTENTION_CLEAR_DELAY = 8000
 
 export const useNotificationStore = defineStore('notification', () => {
@@ -18,7 +17,6 @@ export const useNotificationStore = defineStore('notification', () => {
   const elapsed = ref(0)
   let clearTimer: ReturnType<typeof setTimeout> | null = null
   let tickTimer: ReturnType<typeof setInterval> | null = null
-  let idleTimer: ReturnType<typeof setTimeout> | null = null
 
   const elapsedText = computed(() => {
     const sec = Math.floor(elapsed.value / 1000)
@@ -43,19 +41,6 @@ export const useNotificationStore = defineStore('notification', () => {
     }
   }
 
-  function resetIdleTimer() {
-    if (idleTimer) clearTimeout(idleTimer)
-    idleTimer = setTimeout(() => {
-      // No tool call for IDLE_TIMEOUT → Claude is idle/done
-      if (state.value === 'running') {
-        state.value = 'done'
-        message.value = '任务完成'
-        stopTicker()
-        clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
-      }
-    }, IDLE_TIMEOUT)
-  }
-
   function handle(notif: Notification & { topic?: string }) {
     if (clearTimer) {
       clearTimeout(clearTimer)
@@ -65,12 +50,11 @@ export const useNotificationStore = defineStore('notification', () => {
     switch (notif.type) {
       case 'claude-prompt':
       case 'reasonix-prompt':
-        // User submitted a new prompt — this is the primary "work started" signal
+        // User submitted a new prompt — primary "work started" signal
         source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
         if (notif.topic) topic.value = notif.topic
         if (notif.workDir) workDir.value = notif.workDir
         subagent.value = false
-        // Only reset timer on first start or new prompt during idle
         if (state.value !== 'running') {
           startedAt.value = Date.now()
           elapsed.value = 0
@@ -79,20 +63,19 @@ export const useNotificationStore = defineStore('notification', () => {
         message.value = ''
         tool.value = ''
         startTicker()
-        resetIdleTimer()
         break
 
       case 'claude-tool':
       case 'reasonix-tool':
-        // PostToolUse: update current tool name (lightweight, no timer reset)
+        // PostToolUse: update current tool name (lightweight)
         if (notif.tool) tool.value = notif.tool
+        // If we're not in running state, start (covers edge cases)
         if (state.value !== 'running') {
           source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
           state.value = 'running'
           startedAt.value = Date.now()
           elapsed.value = 0
           startTicker()
-          resetIdleTimer()
         }
         break
 
@@ -101,9 +84,13 @@ export const useNotificationStore = defineStore('notification', () => {
         subagent.value = true
         break
 
+      case 'claude-subagent-done':
+        subagent.value = false
+        break
+
       case 'claude-start':
       case 'reasonix-start':
-        // Tool activity signal (from PreToolUse, if still used)
+        // Legacy: from PreToolUse (if still configured)
         source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
         if (state.value !== 'running') {
           startedAt.value = Date.now()
@@ -113,31 +100,30 @@ export const useNotificationStore = defineStore('notification', () => {
         if (notif.tool) tool.value = notif.tool
         if (notif.workDir) workDir.value = notif.workDir
         startTicker()
-        resetIdleTimer()
         break
 
       case 'claude-notify':
       case 'reasonix-notify':
+        // Permission prompt or attention needed
         source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
         state.value = 'attention'
         message.value = notif.message || '需要关注'
         stopTicker()
-        if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
         clearTimer = setTimeout(() => reset(), ATTENTION_CLEAR_DELAY)
         break
 
       case 'claude-done':
       case 'reasonix-done':
+        // Work completed (Stop/SessionEnd event or process exit)
         state.value = 'done'
         message.value = notif.message || '完成'
         stopTicker()
-        if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
         clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
         break
 
       default:
-        // Unknown type — treat as generic notification
         if (notif.message) {
+          source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
           state.value = 'attention'
           message.value = notif.message
           stopTicker()
@@ -157,7 +143,6 @@ export const useNotificationStore = defineStore('notification', () => {
     startedAt.value = 0
     elapsed.value = 0
     stopTicker()
-    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
   }
 
   function clear() {
