@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+  <!-- Claude-style starburst logo (simplified) -->
+  <g fill="#F0C040" transform="translate(14,14)">
+    <!-- 6 rounded rays -->
+    <rect x="-2" y="-11" width="4" height="8" rx="2"/>
+    <rect x="-2" y="3" width="4" height="8" rx="2"/>
+    <rect x="-11" y="-2" width="8" height="4" rx="2"/>
+    <rect x="3" y="-2" width="8" height="4" rx="2"/>
+    <!-- Diagonal rays -->
+    <rect x="-2" y="-11" width="4" height="8" rx="2" transform="rotate(60)"/>
+    <rect x="-2" y="3" width="4" height="8" rx="2" transform="rotate(60)"/>
+    <rect x="-2" y="-11" width="4" height="8" rx="2" transform="rotate(-60)"/>
+    <rect x="-2" y="3" width="4" height="8" rx="2" transform="rotate(-60)"/>
+    <!-- Center circle -->
+    <circle r="3.5"/>
+  </g>
+</svg>
