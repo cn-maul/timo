@@ -9,17 +9,17 @@ export interface SystemStats {
 }
 
 export const useSystemStore = defineStore('system', () => {
-  const cpu = ref(0)
+  const cpuPercent = ref(0)
   const memPercent = ref(0)
   const memUsedGB = ref(0)
   const memTotalGB = ref(0)
 
   function update(stats: SystemStats) {
-    cpu.value = stats.cpuPercent
+    cpuPercent.value = stats.cpuPercent
     memPercent.value = stats.memPercent
     memUsedGB.value = stats.memUsedGB
     memTotalGB.value = stats.memTotalGB
   }
 
-  return { cpu, memPercent, memUsedGB, memTotalGB, update }
+  return { cpuPercent, memPercent, memUsedGB, memTotalGB, update }
 })

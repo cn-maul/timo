@@ -1,6 +1,19 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { MediaInfo } from '../types/media'
+import { Play, Pause } from '../../bindings/timo/mediaservice'
+
+export function formatTime(ms: number): string {
+  if (ms <= 0) return '0:00'
+  const totalSec = Math.floor(ms / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 export const useMediaStore = defineStore('media', () => {
   const title = ref('')
@@ -12,6 +25,19 @@ export const useMediaStore = defineStore('media', () => {
   const playing = ref(false)
   const hasMedia = ref(false)
 
+  const progressPercent = computed(() => {
+    if (durationMs.value <= 0) return 0
+    return Math.min(100, (positionMs.value / durationMs.value) * 100)
+  })
+
+  async function togglePlay() {
+    try {
+      playing.value ? await Pause() : await Play()
+    } catch (err) {
+      console.error('togglePlay failed:', err)
+    }
+  }
+
   function update(info: MediaInfo) {
     title.value = info.title
     artist.value = info.artist
@@ -20,7 +46,7 @@ export const useMediaStore = defineStore('media', () => {
     durationMs.value = info.durationMs
     positionMs.value = info.positionMs
     playing.value = info.playing
-    hasMedia.value = !!info.title
+    hasMedia.value = !!(info.title || info.artist || info.playing)
   }
 
   function clear() {
@@ -34,5 +60,10 @@ export const useMediaStore = defineStore('media', () => {
     hasMedia.value = false
   }
 
-  return { title, artist, album, coverUrl, durationMs, positionMs, playing, hasMedia, update, clear }
+  return {
+    title, artist, album, coverUrl,
+    durationMs, positionMs, playing, hasMedia,
+    progressPercent,
+    togglePlay, update, clear,
+  }
 })

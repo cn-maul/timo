@@ -1,34 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useMediaStore } from '../stores/media'
-import { Play, Pause, Next, Previous } from '../../bindings/timo/mediaservice'
+import { useMediaStore, formatTime } from '../stores/media'
+import { Next, Previous } from '../../bindings/timo/mediaservice'
 
 const store = useMediaStore()
-
-function formatTime(ms: number): string {
-  if (ms <= 0) return '0:00'
-  const totalSec = Math.floor(ms / 1000)
-  const min = Math.floor(totalSec / 60)
-  const sec = totalSec % 60
-  return `${min}:${sec.toString().padStart(2, '0')}`
-}
-
-const progressPercent = computed(() => {
-  if (store.durationMs <= 0) return 0
-  return Math.min(100, (store.positionMs / store.durationMs) * 100)
-})
-
-async function togglePlay() {
-  try {
-    if (store.playing) {
-      await Pause()
-    } else {
-      await Play()
-    }
-  } catch (e) {
-    console.error('togglePlay failed:', e)
-  }
-}
 
 async function doNext() {
   try { await Next() } catch (e) { console.error('Next failed:', e) }
@@ -59,7 +33,7 @@ async function doPrev() {
       <div class="progress-bar-bg">
         <div
           class="progress-bar-fill"
-          :style="{ width: progressPercent + '%' }"
+          :style="{ width: store.progressPercent + '%' }"
         />
       </div>
       <div class="progress-time">
@@ -69,11 +43,11 @@ async function doPrev() {
     </div>
 
     <div class="controls">
-      <button class="control-btn" @click="doPrev">⏮</button>
-      <button class="control-btn play-pause" @click="togglePlay">
+      <button class="control-btn" aria-label="Previous" @click="doPrev">⏮</button>
+      <button class="control-btn play-pause" aria-label="Play/Pause" @click="store.togglePlay">
         {{ store.playing ? '❚❚' : '▶' }}
       </button>
-      <button class="control-btn" @click="doNext">⏭</button>
+      <button class="control-btn" aria-label="Next" @click="doNext">⏭</button>
     </div>
   </div>
 </template>

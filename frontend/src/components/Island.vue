@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useMediaEvents } from '../composables/useMediaEvents'
 import { useNotificationEvents } from '../composables/useNotificationEvents'
 import { useSystemEvents } from '../composables/useSystemEvents'
 import NotchBar from './NotchBar.vue'
 import DropPanel from './DropPanel.vue'
 
-useMediaEvents()
-useNotificationEvents()
-useSystemEvents()
+const cleanupMedia = useMediaEvents()
+const cleanupNotification = useNotificationEvents()
+const cleanupSystem = useSystemEvents()
 
 const expanded = ref(false)
 let collapseTimer: ReturnType<typeof setTimeout> | null = null
@@ -32,6 +32,13 @@ function resetTimer() {
 }
 
 watch(expanded, (val) => { if (!val) clearCollapseTimer() })
+
+onUnmounted(() => {
+  clearCollapseTimer()
+  cleanupMedia()
+  cleanupNotification()
+  cleanupSystem()
+})
 </script>
 
 <template>

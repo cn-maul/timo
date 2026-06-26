@@ -4,6 +4,7 @@ package media
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -38,6 +39,7 @@ func (p *LinuxProvider) findPlayer() string {
 	}
 	for _, name := range names {
 		if strings.HasPrefix(name, mprisPrefix) && name != mprisPrefix+"d" {
+			// Exclude "d" — the KDE Plasma media controller integration
 			return name
 		}
 	}
@@ -103,6 +105,8 @@ func (p *LinuxProvider) GetState() (*MediaInfo, error) {
 		if status, ok := statusVar.Value().(string); ok {
 			info.Playing = status == "Playing"
 		}
+	} else {
+		log.Printf("timo: failed to get playback status: %v", err)
 	}
 
 	// Position
@@ -116,6 +120,8 @@ func (p *LinuxProvider) GetState() (*MediaInfo, error) {
 		case float64:
 			info.PositionMs = int64(val / 1000)
 		}
+	} else {
+		log.Printf("timo: failed to get position: %v", err)
 	}
 
 	return info, nil

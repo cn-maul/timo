@@ -5,9 +5,14 @@ import type { SystemStats } from '../stores/system'
 export function useSystemEvents() {
   const store = useSystemStore()
 
-  Events.On('sys-stats', (event: { data: SystemStats | null }) => {
-    if (event.data) {
-      store.update(event.data)
+  const handler = (event: { data: SystemStats | null }) => {
+    if (!event.data) {
+      console.warn('[sys-stats] received null data')
+      return
     }
-  })
+    store.update(event.data)
+  }
+
+  Events.On('sys-stats', handler)
+  return () => Events.Off('sys-stats')
 }

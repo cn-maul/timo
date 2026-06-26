@@ -1,13 +1,14 @@
 package main
 
 import (
-	"context"
+	"errors"
 	"timo/media"
 )
 
+var errMediaServiceUnavailable = errors.New("media service unavailable: provider not initialized")
+
 // MediaService exposes playback controls to the frontend via Wails bindings.
 type MediaService struct {
-	ctx    context.Context
 	poller *media.Poller
 }
 
@@ -15,23 +16,42 @@ func NewMediaService(poller *media.Poller) *MediaService {
 	return &MediaService{poller: poller}
 }
 
-func (s *MediaService) ServiceStartup(ctx context.Context) error {
-	s.ctx = ctx
-	return nil
-}
-
 func (s *MediaService) Play() error {
-	return s.poller.GetProvider().Play()
+	p := s.getProvider()
+	if p == nil {
+		return errMediaServiceUnavailable
+	}
+	return p.Play()
 }
 
 func (s *MediaService) Pause() error {
-	return s.poller.GetProvider().Pause()
+	p := s.getProvider()
+	if p == nil {
+		return errMediaServiceUnavailable
+	}
+	return p.Pause()
 }
 
 func (s *MediaService) Next() error {
-	return s.poller.GetProvider().Next()
+	p := s.getProvider()
+	if p == nil {
+		return errMediaServiceUnavailable
+	}
+	return p.Next()
 }
 
 func (s *MediaService) Previous() error {
-	return s.poller.GetProvider().Previous()
+	p := s.getProvider()
+	if p == nil {
+		return errMediaServiceUnavailable
+	}
+	return p.Previous()
+}
+
+// getProvider returns the MediaProvider, or nil if the poller or provider is not initialized.
+func (s *MediaService) getProvider() media.MediaProvider {
+	if s.poller == nil {
+		return nil
+	}
+	return s.poller.GetProvider()
 }

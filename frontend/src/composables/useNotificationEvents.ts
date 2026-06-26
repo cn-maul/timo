@@ -1,14 +1,21 @@
 import { Events } from '@wailsio/runtime'
 import { useNotificationStore } from '../stores/notification'
-import type { Notification } from '../stores/notification'
+import type { Notification } from '../../bindings/timo/models'
 
 export function useNotificationEvents() {
   const store = useNotificationStore()
 
-  Events.On('notification', (event: { data: Notification | null }) => {
-    if (event.data) {
-      console.log('[notification]', event.data.type, event.data.message)
-      store.handle(event.data)
+  const handler = (event: { data: Notification | null }) => {
+    if (!event.data) {
+      console.warn('[notification] received null data')
+      return
     }
-  })
+    if (import.meta.env.DEV) {
+      console.log('[notification]', event.data.type, event.data.message)
+    }
+    store.handle(event.data)
+  }
+
+  Events.On('notification', handler)
+  return () => Events.Off('notification')
 }

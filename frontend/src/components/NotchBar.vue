@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useMediaStore } from '../stores/media'
+import { computed, ref, onBeforeUnmount } from 'vue'
+import { useMediaStore, formatTime } from '../stores/media'
 import { useNotificationStore } from '../stores/notification'
 import { useSystemStore } from '../stores/system'
-import { Play, Pause } from '../../bindings/timo/mediaservice'
 import WaveformBars from './WaveformBars.vue'
 
 const media = useMediaStore()
@@ -17,25 +16,18 @@ const titleText = computed(() => {
 
 const needsScrolling = computed(() => titleText.value.length > 20)
 
-const progressPercent = computed(() => {
-  if (media.durationMs <= 0) return 0
-  return Math.min(100, (media.positionMs / media.durationMs) * 100)
-})
-
 const remainingText = computed(() => {
   if (media.durationMs <= 0) return ''
   const remain = Math.max(0, media.durationMs - media.positionMs)
-  const sec = Math.floor(remain / 1000)
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return `-${m}:${s.toString().padStart(2, '0')}`
+  return `-${formatTime(remain)}`
 })
 
-const hasClaudeActivity = computed(() => notif.state !== '')
+const hasAIActivity = computed(() => notif.state !== '')
 
 // Current time for idle display
 const now = ref(new Date())
-setInterval(() => { now.value = new Date() }, 1000)
+const timer = setInterval(() => { now.value = new Date() }, 1000)
+onBeforeUnmount(() => clearInterval(timer))
 const timeText = computed(() => {
   const h = now.value.getHours()
   const m = now.value.getMinutes()
@@ -43,7 +35,7 @@ const timeText = computed(() => {
 })
 
 const cpuText = computed(() => {
-  const v = sys.cpu
+  const v = sys.cpuPercent
   return v < 10 ? `${v.toFixed(1)}%` : `${Math.round(v)}%`
 })
 
@@ -61,27 +53,18 @@ const shortDir = computed(() => {
 const emit = defineEmits<{
   toggle: []
 }>()
-
-async function togglePlay(e: MouseEvent) {
-  e.stopPropagation()
-  try {
-    media.playing ? await Pause() : await Play()
-  } catch (err) {
-    console.error('togglePlay failed:', err)
-  }
-}
 </script>
 
 <template>
   <div class="notch-bar" @click="emit('toggle')">
     <!-- Claude status -->
-    <template v-if="hasClaudeActivity">
+    <template v-if="hasAIActivity">
       <div class="notch-content">
         <div class="notch-left">
-          <img src="/claude.png" class="claude-logo" alt="Claude" />
+          <img :src="notif.source === 'reasonix' ? '/reasonix.png' : '/claude.png'" class="claude-logo" :alt="notif.source === 'reasonix' ? 'Reasonix' : 'Claude'" />
           <div class="claude-info">
             <span class="claude-text" v-if="notif.state === 'running'">
-              {{ notif.tool || 'Claude 运行中' }}
+              {{ notif.tool || (notif.source === 'reasonix' ? 'Reasonix 运行中' : 'Claude 运行中') }}
             </span>
             <span class="claude-text" v-else-if="notif.state === 'attention'">
               {{ notif.message || '需要关注' }}
@@ -123,14 +106,14 @@ async function togglePlay(e: MouseEvent) {
         </div>
         <div class="notch-right">
           <span class="media-remaining" v-if="remainingText">{{ remainingText }}</span>
-          <span class="notch-play-icon" @click="togglePlay">
+          <span class="notch-play-icon" @click.stop="media.togglePlay">
             {{ media.playing ? '❚❚' : '▶' }}
           </span>
           <WaveformBars :playing="media.playing" />
         </div>
       </div>
       <div class="notch-progress">
-        <div class="notch-progress-fill" :style="{ width: progressPercent + '%' }" />
+        <div class="notch-progress-fill" :style="{ width: media.progressPercent + '%' }" />
       </div>
     </template>
 

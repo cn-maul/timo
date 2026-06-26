@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -28,14 +29,17 @@ func main() {
 	if IsCLI() {
 		if len(os.Args) > 1 && os.Args[1] == "setup" {
 			RunSetup()
+		} else if len(os.Args) > 1 && os.Args[1] == "setup-reasonix" {
+			RunSetupReasonix()
 		} else {
 			RunCLI()
 		}
 		return
 	}
 
-	// Auto-inject Claude Code hooks on first run
+	// Auto-inject Claude Code and Reasonix hooks on first run
 	AutoSetupHooks()
+	AutoSetupReasonixHooks()
 
 	// GUI mode: start the Wails app
 	mainApp = application.New(application.Options{
@@ -52,7 +56,7 @@ func main() {
 	// Media provider
 	provider, err := media.NewProvider()
 	if err != nil {
-		log.Printf("Warning: media provider init failed: %v", err)
+		log.Printf("timo: media provider init failed (%v) — media playback display will be unavailable", err)
 	}
 
 	var poller *media.Poller
@@ -64,7 +68,7 @@ func main() {
 		mainApp.RegisterService(application.NewService(NewMediaService(poller)))
 	}
 
-	// Notification server (for Claude Code hooks)
+	// Notification server (for Claude Code / Reasonix hooks)
 	notifServer := NewNotifyServer(func(n Notification) {
 		mainApp.Event.Emit("notification", &n)
 	})
@@ -75,11 +79,11 @@ func main() {
 		log.Printf("Notification socket: %s", GetSocketPath())
 	}
 
-	// Claude process monitor (detects when claude exits without sending done)
-	claudeMonitor := NewClaudeMonitor(func(n Notification) {
+	// Process monitor (Claude Code + Reasonix)
+	processMonitor := NewProcessMonitor([]string{"claude", "reasonix"}, func(n Notification) {
 		mainApp.Event.Emit("notification", &n)
 	})
-	claudeMonitor.Start()
+	processMonitor.Start()
 
 	// System stats poller (CPU + Memory)
 	sysPoller := NewSystemPoller(func(stats SystemStats) {
@@ -111,6 +115,9 @@ func main() {
 
 	mainWindow.SetBackgroundColour(application.NewRGBA(0, 0, 0, 0))
 
+	// Guard so pollers are only started once (WindowShow can fire multiple times)
+	var startOnce sync.Once
+
 	mainWindow.OnWindowEvent(events.Common.WindowShow, func(event *application.WindowEvent) {
 		screen, err := mainWindow.GetScreen()
 		if err == nil && screen != nil {
@@ -121,23 +128,28 @@ func main() {
 			x := (sw - windowW) / 2
 			mainWindow.SetPosition(x, 0)
 		}
-		if poller != nil {
-			poller.Start()
-		}
-		sysPoller.Start()
+		startOnce.Do(func() {
+			if poller != nil {
+				poller.Start()
+			}
+			sysPoller.Start()
+		})
 	})
+
+	// Defer cleanup so it runs even on panic
+	defer func() {
+		notifServer.Stop()
+		processMonitor.Stop()
+		sysPoller.Stop()
+		if poller != nil {
+			poller.Stop()
+		}
+		if provider != nil {
+			provider.Close()
+		}
+	}()
 
 	if err := mainApp.Run(); err != nil {
 		log.Fatal(err)
-	}
-
-	notifServer.Stop()
-	claudeMonitor.Stop()
-	sysPoller.Stop()
-	if poller != nil {
-		poller.Stop()
-	}
-	if provider != nil {
-		provider.Close()
 	}
 }

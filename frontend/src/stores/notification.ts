@@ -1,15 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { Notification } from '../../bindings/timo/models'
 
-export interface Notification {
-  type: string
-  message: string
-  tool?: string
-  workDir?: string
-}
+const DONE_CLEAR_DELAY = 5000
+const IDLE_TIMEOUT = 10000
+const ATTENTION_CLEAR_DELAY = 8000
 
 export const useNotificationStore = defineStore('notification', () => {
   const state = ref<'running' | 'attention' | 'done' | ''>('')
+  const source = ref<'claude' | 'reasonix' | ''>('')
   const message = ref('')
   const tool = ref('')
   const workDir = ref('')
@@ -45,14 +44,14 @@ export const useNotificationStore = defineStore('notification', () => {
   function resetIdleTimer() {
     if (idleTimer) clearTimeout(idleTimer)
     idleTimer = setTimeout(() => {
-      // No tool call for 10s → Claude is idle/done
+      // No tool call for IDLE_TIMEOUT → Claude is idle/done
       if (state.value === 'running') {
         state.value = 'done'
         message.value = '任务完成'
         stopTicker()
-        clearTimer = setTimeout(() => reset(), 5000)
+        clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
       }
-    }, 10000)
+    }, IDLE_TIMEOUT)
   }
 
   function handle(notif: Notification) {
@@ -63,6 +62,8 @@ export const useNotificationStore = defineStore('notification', () => {
 
     switch (notif.type) {
       case 'claude-start':
+      case 'reasonix-start':
+        source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
         // Only reset timer on first start, not on every tool call
         if (state.value !== 'running') {
           startedAt.value = Date.now()
@@ -76,19 +77,23 @@ export const useNotificationStore = defineStore('notification', () => {
         break
 
       case 'claude-notify':
+      case 'reasonix-notify':
+        source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
         state.value = 'attention'
         message.value = notif.message || '需要关注'
         stopTicker()
         if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
-        clearTimer = setTimeout(() => reset(), 8000)
+        clearTimer = setTimeout(() => reset(), ATTENTION_CLEAR_DELAY)
         break
 
       case 'claude-done':
+      case 'reasonix-done':
+        // Don't change source on done — keep showing the last tool's logo
         state.value = 'done'
         message.value = notif.message || '完成'
         stopTicker()
         if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
-        clearTimer = setTimeout(() => reset(), 5000)
+        clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
         break
 
       default:
@@ -98,6 +103,7 @@ export const useNotificationStore = defineStore('notification', () => {
 
   function reset() {
     state.value = ''
+    source.value = ''
     message.value = ''
     tool.value = ''
     workDir.value = ''
@@ -115,5 +121,5 @@ export const useNotificationStore = defineStore('notification', () => {
     reset()
   }
 
-  return { state, message, tool, workDir, elapsedText, handle, clear }
+  return { state, source, message, tool, workDir, elapsedText, handle, clear }
 })

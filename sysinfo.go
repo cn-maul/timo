@@ -1,13 +1,21 @@
+//go:build linux
+
 package main
 
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+)
+
+const (
+	sysPollInterval = 2 * time.Second
+	kbToGB          = 1048576 // 1024 * 1024 kB per GB
 )
 
 // SystemStats holds CPU and memory usage.
@@ -40,7 +48,7 @@ func (p *SystemPoller) Start() {
 	// Prime CPU readings
 	p.readCPU()
 	go func() {
-		ticker := time.NewTicker(2 * time.Second)
+		ticker := time.NewTicker(sysPollInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -78,6 +86,7 @@ func (p *SystemPoller) poll() {
 func (p *SystemPoller) readCPU() float64 {
 	f, err := os.Open("/proc/stat")
 	if err != nil {
+		log.Printf("sysinfo: failed to open /proc/stat: %v", err)
 		return 0
 	}
 	defer f.Close()
@@ -95,13 +104,20 @@ func (p *SystemPoller) readCPU() float64 {
 
 		var vals [4]uint64
 		for i := 0; i < 4; i++ {
-			vals[i], _ = strconv.ParseUint(fields[i+1], 10, 64)
+			v, err := strconv.ParseUint(fields[i+1], 10, 64)
+			if err != nil {
+				log.Printf("sysinfo: failed to parse cpu field %q: %v", fields[i+1], err)
+			}
+			vals[i] = v
 		}
 		// user + nice + system + idle (+ iowait + irq + softirq + steal)
 		idle := vals[3]
 		var total uint64
 		for i := 1; i < len(fields); i++ {
-			v, _ := strconv.ParseUint(fields[i], 10, 64)
+			v, err := strconv.ParseUint(fields[i], 10, 64)
+			if err != nil {
+				log.Printf("sysinfo: failed to parse cpu total field %q: %v", fields[i], err)
+			}
 			total += v
 		}
 
@@ -123,6 +139,7 @@ func (p *SystemPoller) readCPU() float64 {
 func (p *SystemPoller) readMem() (total, available float64) {
 	f, err := os.Open("/proc/meminfo")
 	if err != nil {
+		log.Printf("sysinfo: failed to open /proc/meminfo: %v", err)
 		return 0, 0
 	}
 	defer f.Close()
@@ -138,7 +155,7 @@ func (p *SystemPoller) readMem() (total, available float64) {
 		if err != nil {
 			continue
 		}
-		valGB := val / 1048576 // kB → GB
+		valGB := val / kbToGB
 		switch {
 		case strings.HasPrefix(line, "MemTotal:"):
 			total = valGB

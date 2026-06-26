@@ -11,3 +11,6 @@ build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
 .claude/
+.reasonix/
+deepseek-color.svg
+timo

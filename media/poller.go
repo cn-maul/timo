@@ -1,6 +1,9 @@
 package media
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // Emitter is a function that sends media state to the frontend.
 type Emitter func(info *MediaInfo)
@@ -12,6 +15,11 @@ type Poller struct {
 	interval time.Duration
 	stop     chan struct{}
 	lastInfo *MediaInfo
+
+	// Guard against double-Start and safe multi-Stop
+	mu       sync.Mutex
+	running  bool
+	stopOnce sync.Once
 }
 
 // NewPoller creates a new Poller.
@@ -25,8 +33,18 @@ func NewPoller(provider MediaProvider, emitter Emitter, interval time.Duration) 
 	}
 }
 
-// Start begins the polling loop in a goroutine.
+// Start begins the polling loop in a goroutine. It is a no-op if already running.
 func (p *Poller) Start() {
+	p.mu.Lock()
+	if p.running {
+		p.mu.Unlock()
+		return
+	}
+	p.running = true
+	p.stop = make(chan struct{})
+	p.stopOnce = sync.Once{}
+	p.mu.Unlock()
+
 	go func() {
 		ticker := time.NewTicker(p.interval)
 		defer ticker.Stop()
@@ -44,9 +62,17 @@ func (p *Poller) Start() {
 	}()
 }
 
-// Stop halts the polling loop.
+// Stop halts the polling loop. Safe to call multiple times.
 func (p *Poller) Stop() {
-	close(p.stop)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.running {
+		return
+	}
+	p.stopOnce.Do(func() {
+		close(p.stop)
+		p.running = false
+	})
 }
 
 func (p *Poller) fetchAndEmit() {
@@ -68,8 +94,10 @@ func (p *Poller) fetchAndEmit() {
 func (p *Poller) hasChanged(info *MediaInfo) bool {
 	if p.lastInfo.Title != info.Title ||
 		p.lastInfo.Artist != info.Artist ||
+		p.lastInfo.Album != info.Album ||
 		p.lastInfo.Playing != info.Playing ||
-		p.lastInfo.CoverURL != info.CoverURL {
+		p.lastInfo.CoverURL != info.CoverURL ||
+		p.lastInfo.DurationMs != info.DurationMs {
 		return true
 	}
 	diff := info.PositionMs - p.lastInfo.PositionMs

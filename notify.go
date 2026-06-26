@@ -14,9 +14,17 @@ import (
 
 const sockPath = "/tmp/timo.sock"
 
+// Chinese string constants for notifications and messages.
+const (
+	msgTaskComplete        = "任务完成"
+	msgConfirmNeeded       = "需要确认"
+	msgAutoConfigSuccess   = "✓ 已自动配置 Claude Code hooks，请重启 Claude Code 使配置生效"
+	msgReasonixAutoConfigSuccess = "✓ 已自动配置 Reasonix hooks，请重启 Reasonix 使配置生效"
+)
+
 // Notification represents a message from external tools.
 type Notification struct {
-	Type    string `json:"type"`    // "claude-start", "claude-done", "claude-notify"
+	Type    string `json:"type"`    // "claude-start"/"reasonix-start", "claude-done"/"reasonix-done", "claude-notify"/"reasonix-notify"
 	Message string `json:"message"` // Human-readable context
 	Tool    string `json:"tool"`    // Current tool name (from PreToolUse)
 	WorkDir string `json:"workDir"` // Working directory
@@ -83,21 +91,24 @@ func (s *NotifyServer) Stop() {
 
 // ── Process monitor for Claude Code ──
 
-// ClaudeMonitor watches for the claude process and sends status updates.
-type ClaudeMonitor struct {
-	emitter  func(Notification)
-	stopCh   chan struct{}
-	lastSeen bool
+// ProcessMonitor watches for specified processes and sends status updates.
+type ProcessMonitor struct {
+	emitter    func(Notification)
+	stopCh     chan struct{}
+	lastSeen   map[string]bool
+	watchNames []string
 }
 
-func NewClaudeMonitor(emitter func(Notification)) *ClaudeMonitor {
-	return &ClaudeMonitor{
-		emitter: emitter,
-		stopCh:  make(chan struct{}),
+func NewProcessMonitor(watchNames []string, emitter func(Notification)) *ProcessMonitor {
+	return &ProcessMonitor{
+		emitter:    emitter,
+		stopCh:     make(chan struct{}),
+		lastSeen:   make(map[string]bool),
+		watchNames: watchNames,
 	}
 }
 
-func (m *ClaudeMonitor) Start() {
+func (m *ProcessMonitor) Start() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -113,20 +124,22 @@ func (m *ClaudeMonitor) Start() {
 	}()
 }
 
-func (m *ClaudeMonitor) Stop() {
+func (m *ProcessMonitor) Stop() {
 	close(m.stopCh)
 }
 
-func (m *ClaudeMonitor) check() {
-	found := isClaudeRunning()
-	if m.lastSeen && !found {
-		// Claude process disappeared → send done
-		m.emitter(Notification{Type: "claude-done", Message: "任务完成"})
+func (m *ProcessMonitor) check() {
+	for _, name := range m.watchNames {
+		found := isProcessRunning(name)
+		if m.lastSeen[name] && !found {
+			// Process disappeared → send done
+			m.emitter(Notification{Type: name + "-done", Message: msgTaskComplete})
+		}
+		m.lastSeen[name] = found
 	}
-	m.lastSeen = found
 }
 
-func isClaudeRunning() bool {
+func isProcessRunning(name string) bool {
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return false
@@ -135,18 +148,27 @@ func isClaudeRunning() bool {
 		if !entry.IsDir() {
 			continue
 		}
-		name := entry.Name()
+		dirName := entry.Name()
 		// Check if it's a PID directory
-		if name[0] < '0' || name[0] > '9' {
+		if len(dirName) == 0 || dirName[0] < '0' || dirName[0] > '9' {
 			continue
 		}
-		cmdline, err := os.ReadFile("/proc/" + name + "/cmdline")
+		// Use /proc/PID/comm for precise process name matching
+		comm, err := os.ReadFile("/proc/" + dirName + "/comm")
 		if err != nil {
 			continue
 		}
-		cmd := string(cmdline)
-		if strings.Contains(cmd, "claude") && !strings.Contains(cmd, "timo") {
-			return true
+		procName := strings.TrimSpace(string(comm))
+		if procName == name {
+			// Also verify it's not our own timo process by checking cmdline
+			cmdline, err := os.ReadFile("/proc/" + dirName + "/cmdline")
+			if err != nil {
+				continue
+			}
+			cmd := string(cmdline)
+			if !strings.Contains(cmd, "timo") {
+				return true
+			}
 		}
 	}
 	return false
@@ -197,7 +219,15 @@ func RunCLI() {
 	}
 
 	// Read stdin for hook data (PreToolUse sends JSON with tool_name, etc.)
-	stat, _ := os.Stdin.Stat()
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		log.Printf("Error: cannot stat stdin: %v", err)
+		return
+	}
+	if stat == nil {
+		log.Println("Error: stdin stat returned nil")
+		return
+	}
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(io.LimitReader(os.Stdin, 4096))
 		if err == nil && len(data) > 0 {
@@ -220,86 +250,26 @@ func RunCLI() {
 }
 
 func IsCLI() bool {
-	return len(os.Args) > 1 && (os.Args[1] == "notify" || os.Args[1] == "setup")
+	return len(os.Args) > 1 && (os.Args[1] == "notify" || os.Args[1] == "setup" || os.Args[1] == "setup-reasonix")
 }
 
 // RunSetup configures Claude Code hooks globally in ~/.claude/settings.json.
 func RunSetup() {
-	home, _ := os.UserHomeDir()
-	claudeDir := filepath.Join(home, ".claude")
-	settingsPath := filepath.Join(claudeDir, "settings.json")
-
-	// Find timo binary path
-	timoPath, err := os.Executable()
+	timoPath, err := setupHooks(false)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: cannot determine timo path: %v\n", err)
-		os.Exit(1)
-	}
-	timoPath, _ = filepath.Abs(timoPath)
-
-	// Read existing settings
-	var settings map[string]interface{}
-	data, err := os.ReadFile(settingsPath)
-	if err == nil {
-		json.Unmarshal(data, &settings)
-	}
-	if settings == nil {
-		settings = make(map[string]interface{})
-	}
-
-	// Build hooks config
-	hooks := map[string]interface{}{
-		"PreToolUse": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type claude-start --dir "$(pwd)"`,
-					},
-				},
-			},
-		},
-		"Stop": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type claude-done --msg "任务完成"`,
-					},
-				},
-			},
-		},
-		"Notification": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type claude-notify --msg "需要确认"`,
-					},
-				},
-			},
-		},
-	}
-	settings["hooks"] = hooks
-
-	// Write back
-	os.MkdirAll(claudeDir, 0755)
-	out, _ := json.MarshalIndent(settings, "", "  ")
-	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", settingsPath, err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
+	home, _ := os.UserHomeDir()
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
 	fmt.Printf("✓ Claude Code hooks configured in %s\n", settingsPath)
 	fmt.Printf("  Timo path: %s\n", timoPath)
 	fmt.Printf("  Hooks: PreToolUse, Stop, Notification\n")
 }
 
 func SetSocketPermissions() {
-	os.Chmod(sockPath, 0777)
+	os.Chmod(sockPath, 0600)
 }
 
 func GetSocketPath() string {
@@ -309,42 +279,116 @@ func GetSocketPath() string {
 
 // AutoSetupHooks checks if Claude Code hooks are configured, and injects them if not.
 func AutoSetupHooks() {
+	timoPath, err := setupHooks(true)
+	if err != nil {
+		log.Printf("AutoSetupHooks: %v", err)
+		return
+	}
+	if timoPath != "" {
+		log.Println(msgAutoConfigSuccess)
+	}
+}
+
+// isTimoHook returns true if a hook command entry contains "timo notify".
+func isTimoHook(entry map[string]interface{}) bool {
+	cmd, _ := entry["command"].(string)
+	return strings.Contains(cmd, "timo notify")
+}
+
+// setupHooks is the shared implementation for RunSetup and AutoSetupHooks.
+func setupHooks(isAuto bool) (string, error) {
+	return installHooks(isAuto, ".claude", "claude", msgAutoConfigSuccess)
+}
+
+// setupReasonixHooks configures Reasonix hooks in ~/.reasonix/settings.json.
+func setupReasonixHooks(isAuto bool) (string, error) {
+	return installHooks(isAuto, ".reasonix", "reasonix", msgReasonixAutoConfigSuccess)
+}
+
+// AutoSetupReasonixHooks checks if Reasonix hooks are configured, and injects them if not.
+func AutoSetupReasonixHooks() {
+	timoPath, err := setupReasonixHooks(true)
+	if err != nil {
+		log.Printf("AutoSetupReasonixHooks: %v", err)
+		return
+	}
+	if timoPath != "" {
+		log.Println(msgReasonixAutoConfigSuccess)
+	}
+}
+
+// RunSetupReasonix configures Reasonix hooks globally in ~/.reasonix/settings.json.
+func RunSetupReasonix() {
+	timoPath, err := setupReasonixHooks(false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	home, _ := os.UserHomeDir()
-	settingsPath := filepath.Join(home, ".claude", "settings.json")
+	settingsPath := filepath.Join(home, ".reasonix", "settings.json")
+	fmt.Printf("✓ Reasonix hooks configured in %s\n", settingsPath)
+	fmt.Printf("  Timo path: %s\n", timoPath)
+	fmt.Printf("  Hooks: PreToolUse, Stop, Notification\n")
+}
+
+// installHooks is the shared implementation for setupHooks and setupReasonixHooks.
+// When isAuto is true, it skips configuration if timo hooks already exist.
+// It merges timo hooks into existing settings, preserving any non-timo hooks.
+func installHooks(isAuto bool, configDir string, typePrefix string, successMsg string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	configPath := filepath.Join(home, configDir)
+	settingsPath := filepath.Join(configPath, "settings.json")
 
 	timoPath, err := os.Executable()
 	if err != nil {
-		return
+		return "", fmt.Errorf("cannot determine timo path: %w", err)
 	}
-	timoPath, _ = filepath.Abs(timoPath)
+	absPath, err := filepath.Abs(timoPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve timo path: %w", err)
+	}
+	timoPath = absPath
 
 	// Read existing settings
 	var settings map[string]interface{}
 	data, err := os.ReadFile(settingsPath)
 	if err == nil {
-		json.Unmarshal(data, &settings)
+		// Validate that the file is valid JSON before proceeding
+		if err := json.Unmarshal(data, &settings); err != nil {
+			return "", fmt.Errorf("%s contains invalid JSON: %w; please fix or delete the file", settingsPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("cannot read %s: %w", settingsPath, err)
 	}
 	if settings == nil {
 		settings = make(map[string]interface{})
 	}
 
-	// Check if our hooks are already there
-	if hooksRaw, ok := settings["hooks"]; ok {
-		hooksJSON, _ := json.Marshal(hooksRaw)
-		if strings.Contains(string(hooksJSON), "timo notify") {
-			return // already configured
+	// In auto mode, skip if timo hooks are already configured
+	if isAuto {
+		if hooksRaw, ok := settings["hooks"]; ok {
+			hooksJSON, err := json.Marshal(hooksRaw)
+			if err != nil {
+				log.Printf("Warning: cannot marshal existing hooks: %v", err)
+			} else if strings.Contains(string(hooksJSON), "timo notify") {
+				return "", nil // already configured
+			}
 		}
 	}
 
-	// Inject hooks
-	hooks := map[string]interface{}{
+	// Build the desired timo hooks config
+	timoHooks := map[string]interface{}{
 		"PreToolUse": []interface{}{
 			map[string]interface{}{
 				"matcher": "",
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": timoPath + ` notify --type claude-start --dir "$(pwd)"`,
+						"command": timoPath + ` notify --type ` + typePrefix + `-start --dir "$(pwd)"`,
 					},
 				},
 			},
@@ -355,7 +399,7 @@ func AutoSetupHooks() {
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": timoPath + ` notify --type claude-done --msg "任务完成"`,
+						"command": timoPath + ` notify --type ` + typePrefix + `-done --msg "` + msgTaskComplete + `"`,
 					},
 				},
 			},
@@ -366,17 +410,60 @@ func AutoSetupHooks() {
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": timoPath + ` notify --type claude-notify --msg "需要确认"`,
+						"command": timoPath + ` notify --type ` + typePrefix + `-notify --msg "` + msgConfirmNeeded + `"`,
 					},
 				},
 			},
 		},
 	}
-	settings["hooks"] = hooks
 
-	os.MkdirAll(filepath.Join(home, ".claude"), 0755)
-	out, _ := json.MarshalIndent(settings, "", "  ")
-	os.WriteFile(settingsPath, append(out, '\n'), 0644)
+	// Merge: preserve non-timo hooks, replace timo hooks for each event type.
+	// For any event type not covered by timoHooks, existing entries are kept.
+	merged := make(map[string]interface{})
+	if existingHooks, ok := settings["hooks"].(map[string]interface{}); ok {
+		for event, existingRaw := range existingHooks {
+			if _, ok := timoHooks[event]; ok {
+				// This event type is managed by timo; filter out old timo entries,
+				// then append the new timo entry below.
+				existingArr, _ := existingRaw.([]interface{})
+				for _, entry := range existingArr {
+					if m, ok := entry.(map[string]interface{}); ok {
+						entries, _ := m["hooks"].([]interface{})
+						kept := make([]interface{}, 0, len(entries))
+						for _, h := range entries {
+							if hookMap, ok := h.(map[string]interface{}); ok && !isTimoHook(hookMap) {
+								kept = append(kept, h)
+							}
+						}
+						if len(kept) > 0 {
+							m["hooks"] = kept
+							merged[event] = append(merged[event].([]interface{}), m)
+						}
+					}
+				}
+			} else {
+				// Event type not managed by timo; keep it as-is.
+				merged[event] = existingRaw
+			}
+		}
+	}
+	// Append the timo hook entries for each managed event type.
+	for event, timoEntries := range timoHooks {
+		merged[event] = append(merged[event].([]interface{}), timoEntries.([]interface{})...)
+	}
+	settings["hooks"] = merged
 
-	log.Println("✓ 已自动配置 Claude Code hooks，请重启 Claude Code 使配置生效")
+	// Write back
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		return "", fmt.Errorf("cannot create %s: %w", configPath, err)
+	}
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("cannot encode settings: %w", err)
+	}
+	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
+		return "", fmt.Errorf("cannot write %s: %w", settingsPath, err)
+	}
+
+	return timoPath, nil
 }
