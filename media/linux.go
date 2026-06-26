@@ -18,7 +18,8 @@ const (
 
 // LinuxProvider implements MediaProvider using MPRIS over D-Bus.
 type LinuxProvider struct {
-	conn *dbus.Conn
+	conn       *dbus.Conn
+	lastPlayer string
 }
 
 // NewLinuxProvider connects to the session bus.
@@ -30,20 +31,28 @@ func NewLinuxProvider() (*LinuxProvider, error) {
 	return &LinuxProvider{conn: conn}, nil
 }
 
-// findPlayer returns the bus name of the first active MPRIS player.
+// findPlayer returns the bus name of an active MPRIS player, preferring
+// the last active player for stability when multiple players are running.
 func (p *LinuxProvider) findPlayer() string {
 	var names []string
 	err := p.conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names)
 	if err != nil {
 		return ""
 	}
+	var first string
 	for _, name := range names {
 		if strings.HasPrefix(name, mprisPrefix) && name != mprisPrefix+"d" {
-			// Exclude "d" — the KDE Plasma media controller integration
-			return name
+			if first == "" {
+				first = name
+			}
+			// Prefer the last active player for stability
+			if name == p.lastPlayer {
+				return name
+			}
 		}
 	}
-	return ""
+	p.lastPlayer = first
+	return first
 }
 
 func (p *LinuxProvider) getPlayerObject() (dbus.BusObject, error) {

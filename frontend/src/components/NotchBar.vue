@@ -73,7 +73,7 @@ const emit = defineEmits<{
               {{ notif.message || '完成' }}
             </span>
             <span class="claude-dir" v-if="shortDir">{{ shortDir }}</span>
-        </div>
+          </div>
         </div>
         <div class="notch-right">
           <span class="claude-timer" v-if="notif.state === 'running'">{{ notif.elapsedText }}</span>

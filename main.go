@@ -1,3 +1,5 @@
+//go:build linux
+
 package main
 
 import (
@@ -75,7 +77,6 @@ func main() {
 	if err := notifServer.Start(); err != nil {
 		log.Printf("Warning: notification server failed: %v", err)
 	} else {
-		SetSocketPermissions()
 		log.Printf("Notification socket: %s", GetSocketPath())
 	}
 
@@ -128,6 +129,8 @@ func main() {
 			x := (sw - windowW) / 2
 			mainWindow.SetPosition(x, 0)
 		}
+		// Configure as dock window: skip taskbar, always on top
+		configureDockWindow(mainWindow.NativeWindow())
 		startOnce.Do(func() {
 			if poller != nil {
 				poller.Start()

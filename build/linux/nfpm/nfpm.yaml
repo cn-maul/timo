@@ -28,6 +28,7 @@ contents:
 depends:
   - libgtk-4-1
   - libwebkitgtk-6.0-4
+  - libx11-6
 
 # Distribution-specific overrides for different package formats
 overrides:

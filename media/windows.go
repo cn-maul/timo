@@ -13,8 +13,8 @@ import "fmt"
 // WindowsProvider implements MediaProvider using GSMTC via PowerShell.
 type WindowsProvider struct{}
 
-func NewWindowsProvider() (*WindowsProvider, error) {
-	return &WindowsProvider{}, nil
+func NewWindowsProvider() (MediaProvider, error) {
+	return nil, fmt.Errorf("windows media provider: not yet implemented")
 }
 
 func (p *WindowsProvider) GetState() (*MediaInfo, error) {

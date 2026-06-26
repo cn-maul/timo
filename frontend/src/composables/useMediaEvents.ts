@@ -13,6 +13,6 @@ export function useMediaEvents() {
     store.update(event.data)
   }
 
-  Events.On('media-update', handler)
-  return () => Events.Off('media-update')
+  const off = Events.On('media-update', handler)
+  return off
 }

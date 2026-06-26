@@ -13,6 +13,6 @@ export function useSystemEvents() {
     store.update(event.data)
   }
 
-  Events.On('sys-stats', handler)
-  return () => Events.Off('sys-stats')
+  const off = Events.On('sys-stats', handler)
+  return off
 }

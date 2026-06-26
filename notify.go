@@ -1,3 +1,5 @@
+//go:build linux
+
 package main
 
 import (
@@ -50,6 +52,8 @@ func (s *NotifyServer) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", sockPath, err)
 	}
+	// Set permissions immediately after socket creation to minimize exposure
+	os.Chmod(sockPath, 0600)
 	s.listener = ln
 
 	go func() {
@@ -266,10 +270,6 @@ func RunSetup() {
 	fmt.Printf("✓ Claude Code hooks configured in %s\n", settingsPath)
 	fmt.Printf("  Timo path: %s\n", timoPath)
 	fmt.Printf("  Hooks: PreToolUse, Stop, Notification\n")
-}
-
-func SetSocketPermissions() {
-	os.Chmod(sockPath, 0600)
 }
 
 func GetSocketPath() string {

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { Notification } from '../../bindings/timo/models'
 
 const DONE_CLEAR_DELAY = 5000
-const IDLE_TIMEOUT = 10000
+const IDLE_TIMEOUT = 30000
 const ATTENTION_CLEAR_DELAY = 8000
 
 export const useNotificationStore = defineStore('notification', () => {

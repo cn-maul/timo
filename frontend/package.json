@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vueuse/motion": "^3.0.3",
     "@wailsio/runtime": "latest",
     "pinia": "^3.0.4",
     "vue": "^3.2.45"

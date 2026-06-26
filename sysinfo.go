@@ -4,7 +4,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -15,7 +14,7 @@ import (
 
 const (
 	sysPollInterval = 2 * time.Second
-	kbToGB          = 1048576 // 1024 * 1024 kB per GB
+	kbPerGB         = 1048576 // 1024 * 1024 kB per GB
 )
 
 // SystemStats holds CPU and memory usage.
@@ -155,7 +154,7 @@ func (p *SystemPoller) readMem() (total, available float64) {
 		if err != nil {
 			continue
 		}
-		valGB := val / kbToGB
+		valGB := val / kbPerGB
 		switch {
 		case strings.HasPrefix(line, "MemTotal:"):
 			total = valGB
@@ -167,19 +166,4 @@ func (p *SystemPoller) readMem() (total, available float64) {
 		}
 	}
 	return
-}
-
-// FormatPercent returns a display string like "23%" or "4.1G"
-func FormatPercent(v float64) string {
-	if v < 10 {
-		return fmt.Sprintf("%.1f%%", v)
-	}
-	return fmt.Sprintf("%.0f%%", v)
-}
-
-func FormatGB(v float64) string {
-	if v < 10 {
-		return fmt.Sprintf("%.1fG", v)
-	}
-	return fmt.Sprintf("%.0fG", v)
 }

@@ -16,6 +16,6 @@ export function useNotificationEvents() {
     store.handle(event.data)
   }
 
-  Events.On('notification', handler)
-  return () => Events.Off('notification')
+  const off = Events.On('notification', handler)
+  return off
 }
