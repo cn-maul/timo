@@ -97,10 +97,11 @@ func (s *NotifyServer) Stop() {
 // ── Process monitor for Claude Code ──
 
 // ProcessMonitor watches for specified processes and sends status updates.
+// Tracks process counts per name; only emits "done" when ALL instances exit.
 type ProcessMonitor struct {
 	emitter    func(Notification)
 	stopCh     chan struct{}
-	lastSeen   map[string]bool
+	lastCount  map[string]int  // how many instances of each process were running
 	watchNames []string
 }
 
@@ -108,7 +109,7 @@ func NewProcessMonitor(watchNames []string, emitter func(Notification)) *Process
 	return &ProcessMonitor{
 		emitter:    emitter,
 		stopCh:     make(chan struct{}),
-		lastSeen:   make(map[string]bool),
+		lastCount:  make(map[string]int),
 		watchNames: watchNames,
 	}
 }
@@ -135,48 +136,53 @@ func (m *ProcessMonitor) Stop() {
 
 func (m *ProcessMonitor) check() {
 	for _, name := range m.watchNames {
-		found := isProcessRunning(name)
-		if m.lastSeen[name] && !found {
-			// Process disappeared → send done
+		count := countProcesses(name)
+		prev := m.lastCount[name]
+		// Only emit done when transitioning from "some running" to "none running"
+		if prev > 0 && count == 0 {
 			m.emitter(Notification{Type: name + "-done", Message: msgTaskComplete})
 		}
-		m.lastSeen[name] = found
+		m.lastCount[name] = count
 	}
 }
 
+// isProcessRunning returns true if any process with the given name is running.
 func isProcessRunning(name string) bool {
+	return countProcesses(name) > 0
+}
+
+// countProcesses returns the number of running processes with the given name.
+func countProcesses(name string) int {
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
-		return false
+		return 0
 	}
+	count := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		dirName := entry.Name()
-		// Check if it's a PID directory
 		if len(dirName) == 0 || dirName[0] < '0' || dirName[0] > '9' {
 			continue
 		}
-		// Use /proc/PID/comm for precise process name matching
 		comm, err := os.ReadFile("/proc/" + dirName + "/comm")
 		if err != nil {
 			continue
 		}
 		procName := strings.TrimSpace(string(comm))
 		if procName == name {
-			// Also verify it's not our own timo process by checking cmdline
 			cmdline, err := os.ReadFile("/proc/" + dirName + "/cmdline")
 			if err != nil {
 				continue
 			}
 			cmd := string(cmdline)
 			if !strings.Contains(cmd, "timo") {
-				return true
+				count++
 			}
 		}
 	}
-	return false
+	return count
 }
 
 // ── CLI ──
@@ -353,6 +359,7 @@ func RunSetupReasonix() {
 func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{} {
 	if typePrefix == "reasonix" {
 		// Reasonix flat format per DESKTOP_HOOKS spec
+		// No Stop hook — ProcessMonitor detects process exit (handles multiple instances)
 		return map[string]interface{}{
 			"UserPromptSubmit": []interface{}{
 				map[string]interface{}{
@@ -365,14 +372,10 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 					"command": timoPath + ` notify --type reasonix-tool`,
 				},
 			},
-			"Stop": []interface{}{
-				map[string]interface{}{
-					"command": timoPath + ` notify --type reasonix-done --msg "` + msgTaskComplete + `"`,
-				},
-			},
 		}
 	}
 	// Claude Code nested format
+	// No Stop/SessionEnd hooks — ProcessMonitor detects process exit (handles multiple instances)
 	return map[string]interface{}{
 		"UserPromptSubmit": []interface{}{
 			map[string]interface{}{
@@ -414,28 +417,6 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 					map[string]interface{}{
 						"type":    "command",
 						"command": timoPath + ` notify --type claude-subagent-done`,
-					},
-				},
-			},
-		},
-		"Stop": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type claude-done --msg "` + msgTaskComplete + `"`,
-					},
-				},
-			},
-		},
-		"SessionEnd": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type claude-done --msg "` + msgTaskComplete + `"`,
 					},
 				},
 			},

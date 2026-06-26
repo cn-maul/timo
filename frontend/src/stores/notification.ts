@@ -61,7 +61,7 @@ export const useNotificationStore = defineStore('notification', () => {
         }
         state.value = 'running'
         message.value = ''
-        tool.value = ''
+        // Don't clear tool — let PostToolUse update it naturally
         startTicker()
         break
 
