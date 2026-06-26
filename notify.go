@@ -26,10 +26,11 @@ const (
 
 // Notification represents a message from external tools.
 type Notification struct {
-	Type    string `json:"type"`    // "claude-start"/"reasonix-start", "claude-done"/"reasonix-done", "claude-notify"/"reasonix-notify"
+	Type    string `json:"type"`    // "claude-prompt"/"reasonix-prompt", "claude-done"/"reasonix-done", "claude-notify"/"reasonix-notify"
 	Message string `json:"message"` // Human-readable context
 	Tool    string `json:"tool"`    // Current tool name (from PreToolUse)
 	WorkDir string `json:"workDir"` // Working directory
+	Topic   string `json:"topic"`   // User's prompt text (from UserPromptSubmit)
 }
 
 // NotifyServer listens on a Unix domain socket for notifications.
@@ -222,7 +223,7 @@ func RunCLI() {
 		}
 	}
 
-	// Read stdin for hook data (PreToolUse sends JSON with tool_name, etc.)
+	// Read stdin for hook data from Claude Code / Reasonix
 	stat, err := os.Stdin.Stat()
 	if err != nil {
 		log.Printf("Error: cannot stat stdin: %v", err)
@@ -237,11 +238,25 @@ func RunCLI() {
 		if err == nil && len(data) > 0 {
 			var hookData map[string]interface{}
 			if json.Unmarshal(data, &hookData) == nil {
-				if tn, ok := hookData["tool_name"].(string); ok && notif.Tool == "" {
-					notif.Tool = tn
+				// Tool name: Claude uses "tool_name" (snake_case), Reasonix uses "toolName" (camelCase)
+				if notif.Tool == "" {
+					if tn, ok := hookData["tool_name"].(string); ok {
+						notif.Tool = tn
+					} else if tn, ok := hookData["toolName"].(string); ok {
+						notif.Tool = tn
+					}
 				}
+				// Message from hook payload (e.g. Notification event)
 				if msg, ok := hookData["message"].(string); ok && notif.Message == "" {
 					notif.Message = msg
+				}
+				// User prompt from UserPromptSubmit event (both tools use "prompt")
+				if prompt, ok := hookData["prompt"].(string); ok && prompt != "" && notif.Topic == "" {
+					notif.Topic = prompt
+				}
+				// Working directory from Reasonix payload (has "cwd" field)
+				if cwd, ok := hookData["cwd"].(string); ok && cwd != "" && notif.WorkDir == "" {
+					notif.WorkDir = cwd
 				}
 			}
 		}
@@ -269,7 +284,7 @@ func RunSetup() {
 	settingsPath := filepath.Join(home, ".claude", "settings.json")
 	fmt.Printf("✓ Claude Code hooks configured in %s\n", settingsPath)
 	fmt.Printf("  Timo path: %s\n", timoPath)
-	fmt.Printf("  Hooks: PreToolUse, Stop, Notification\n")
+	fmt.Printf("  Hooks: UserPromptSubmit, Stop, Notification\n")
 }
 
 func GetSocketPath() string {
@@ -329,19 +344,19 @@ func RunSetupReasonix() {
 	settingsPath := filepath.Join(home, ".reasonix", "settings.json")
 	fmt.Printf("✓ Reasonix hooks configured in %s\n", settingsPath)
 	fmt.Printf("  Timo path: %s\n", timoPath)
-	fmt.Printf("  Hooks: PreToolUse, Stop, Notification\n")
+	fmt.Printf("  Hooks: UserPromptSubmit, Stop\n")
 }
 
 // buildHooksConfig builds the timo hooks entries for the given type prefix.
-// Reasonix uses flat format: {match, command}; Claude uses nested format: {matcher, hooks: [{type, command}]}.
+// Uses UserPromptSubmit (not PreToolUse) as the primary "work started" signal.
+// Reasonix uses flat format: {command}; Claude uses nested format: {matcher, hooks: [{type, command}]}.
 func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{} {
 	if typePrefix == "reasonix" {
 		// Reasonix flat format per DESKTOP_HOOKS spec
 		return map[string]interface{}{
-			"PreToolUse": []interface{}{
+			"UserPromptSubmit": []interface{}{
 				map[string]interface{}{
-					"match":   "*",
-					"command": timoPath + ` notify --type reasonix-start --dir "$(pwd)"`,
+					"command": timoPath + ` notify --type reasonix-prompt --dir "$(pwd)"`,
 				},
 			},
 			"Stop": []interface{}{
@@ -349,27 +364,33 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 					"command": timoPath + ` notify --type reasonix-done --msg "` + msgTaskComplete + `"`,
 				},
 			},
-			"Notification": []interface{}{
-				map[string]interface{}{
-					"command": timoPath + ` notify --type reasonix-notify --msg "` + msgConfirmNeeded + `"`,
-				},
-			},
 		}
 	}
 	// Claude Code nested format
 	return map[string]interface{}{
-		"PreToolUse": []interface{}{
+		"UserPromptSubmit": []interface{}{
 			map[string]interface{}{
 				"matcher": "",
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": timoPath + ` notify --type claude-start --dir "$(pwd)"`,
+						"command": timoPath + ` notify --type claude-prompt --dir "$(pwd)"`,
 					},
 				},
 			},
 		},
 		"Stop": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-done --msg "` + msgTaskComplete + `"`,
+					},
+				},
+			},
+		},
+		"SessionEnd": []interface{}{
 			map[string]interface{}{
 				"matcher": "",
 				"hooks": []interface{}{

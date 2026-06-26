@@ -12,6 +12,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const message = ref('')
   const tool = ref('')
   const workDir = ref('')
+  const topic = ref('')
   const startedAt = ref(0)
   const elapsed = ref(0)
   let clearTimer: ReturnType<typeof setTimeout> | null = null
@@ -54,17 +55,34 @@ export const useNotificationStore = defineStore('notification', () => {
     }, IDLE_TIMEOUT)
   }
 
-  function handle(notif: Notification) {
+  function handle(notif: Notification & { topic?: string }) {
     if (clearTimer) {
       clearTimeout(clearTimer)
       clearTimer = null
     }
 
     switch (notif.type) {
+      case 'claude-prompt':
+      case 'reasonix-prompt':
+        // User submitted a new prompt — this is the primary "work started" signal
+        source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
+        if (notif.topic) topic.value = notif.topic
+        if (notif.workDir) workDir.value = notif.workDir
+        // Only reset timer on first start or new prompt during idle
+        if (state.value !== 'running') {
+          startedAt.value = Date.now()
+          elapsed.value = 0
+        }
+        state.value = 'running'
+        message.value = ''
+        startTicker()
+        resetIdleTimer()
+        break
+
       case 'claude-start':
       case 'reasonix-start':
+        // Tool activity signal (from PreToolUse, if still used)
         source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
-        // Only reset timer on first start, not on every tool call
         if (state.value !== 'running') {
           startedAt.value = Date.now()
           elapsed.value = 0
@@ -88,7 +106,6 @@ export const useNotificationStore = defineStore('notification', () => {
 
       case 'claude-done':
       case 'reasonix-done':
-        // Don't change source on done — keep showing the last tool's logo
         state.value = 'done'
         message.value = notif.message || '完成'
         stopTicker()
@@ -97,7 +114,13 @@ export const useNotificationStore = defineStore('notification', () => {
         break
 
       default:
-        reset()
+        // Unknown type — treat as generic notification
+        if (notif.message) {
+          state.value = 'attention'
+          message.value = notif.message
+          stopTicker()
+          clearTimer = setTimeout(() => reset(), ATTENTION_CLEAR_DELAY)
+        }
     }
   }
 
@@ -107,6 +130,7 @@ export const useNotificationStore = defineStore('notification', () => {
     message.value = ''
     tool.value = ''
     workDir.value = ''
+    topic.value = ''
     startedAt.value = 0
     elapsed.value = 0
     stopTicker()
@@ -121,5 +145,5 @@ export const useNotificationStore = defineStore('notification', () => {
     reset()
   }
 
-  return { state, source, message, tool, workDir, elapsedText, handle, clear }
+  return { state, source, message, tool, workDir, topic, elapsedText, handle, clear }
 })
