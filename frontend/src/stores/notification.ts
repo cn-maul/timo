@@ -61,7 +61,7 @@ export const useNotificationStore = defineStore('notification', () => {
         }
         state.value = 'running'
         message.value = ''
-        // Don't clear tool — let PostToolUse update it naturally
+        tool.value = ''
         startTicker()
         break
 
@@ -88,20 +88,6 @@ export const useNotificationStore = defineStore('notification', () => {
         subagent.value = false
         break
 
-      case 'claude-start':
-      case 'reasonix-start':
-        // Legacy: from PreToolUse (if still configured)
-        source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
-        if (state.value !== 'running') {
-          startedAt.value = Date.now()
-          elapsed.value = 0
-        }
-        state.value = 'running'
-        if (notif.tool) tool.value = notif.tool
-        if (notif.workDir) workDir.value = notif.workDir
-        startTicker()
-        break
-
       case 'claude-notify':
       case 'reasonix-notify':
         // Permission prompt or attention needed
@@ -122,6 +108,7 @@ export const useNotificationStore = defineStore('notification', () => {
         break
 
       default:
+        console.warn(`[notification] unhandled type: ${notif.type}`)
         if (notif.message) {
           source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
           state.value = 'attention'

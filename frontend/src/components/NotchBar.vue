@@ -50,6 +50,16 @@ const shortDir = computed(() => {
   return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : notif.workDir
 })
 
+// Encapsulate running-state primary text selection
+const primaryText = computed(() => {
+  if (notif.state !== 'running') return ''
+  return notif.topic || notif.tool || (notif.source === 'reasonix' ? 'Reasonix 运行中' : 'Claude 运行中')
+})
+
+const showToolLine = computed(() =>
+  notif.state === 'running' && notif.topic && notif.tool
+)
+
 const emit = defineEmits<{
   toggle: []
 }>()
@@ -64,10 +74,10 @@ const emit = defineEmits<{
           <img :src="notif.source === 'reasonix' ? '/reasonix.png' : '/claude.png'" class="claude-logo" :alt="notif.source === 'reasonix' ? 'Reasonix' : 'Claude'" />
           <div class="claude-info">
             <span class="claude-text" v-if="notif.state === 'running'">
-              {{ notif.topic || notif.tool || (notif.source === 'reasonix' ? 'Reasonix 运行中' : 'Claude 运行中') }}
+              {{ primaryText }}
               <span v-if="notif.subagent" class="subagent-badge">⚡</span>
             </span>
-            <span class="claude-text claude-tool" v-if="notif.state === 'running' && notif.topic && notif.tool">
+            <span class="claude-text claude-tool" v-if="showToolLine">
               {{ notif.tool }}
             </span>
             <span class="claude-text" v-else-if="notif.state === 'attention'">

@@ -26,7 +26,7 @@ const (
 
 // Notification represents a message from external tools.
 type Notification struct {
-	Type    string `json:"type"`    // "claude-prompt"/"reasonix-prompt", "claude-done"/"reasonix-done", "claude-notify"/"reasonix-notify"
+	Type    string `json:"type"`    // "claude-prompt"/"reasonix-prompt", "claude-tool"/"reasonix-tool", "claude-subagent"/"reasonix-subagent", "claude-subagent-done", "claude-notify"/"reasonix-notify", "claude-done"/"reasonix-done"
 	Message string `json:"message"` // Human-readable context
 	Tool    string `json:"tool"`    // Current tool name (from PreToolUse)
 	WorkDir string `json:"workDir"` // Working directory
@@ -106,12 +106,17 @@ type ProcessMonitor struct {
 }
 
 func NewProcessMonitor(watchNames []string, emitter func(Notification)) *ProcessMonitor {
-	return &ProcessMonitor{
+	pm := &ProcessMonitor{
 		emitter:    emitter,
 		stopCh:     make(chan struct{}),
 		lastCount:  make(map[string]int),
 		watchNames: watchNames,
 	}
+	// 初始化时立即记录当前进程计数，避免首次 check 前的遗漏窗口
+	for _, name := range watchNames {
+		pm.lastCount[name] = countProcesses(name)
+	}
+	return pm
 }
 
 func (m *ProcessMonitor) Start() {
@@ -258,7 +263,11 @@ func RunCLI() {
 				}
 				// User prompt from UserPromptSubmit event (both tools use "prompt")
 				if prompt, ok := hookData["prompt"].(string); ok && prompt != "" && notif.Topic == "" {
-					notif.Topic = prompt
+					if len(prompt) > 500 {
+						notif.Topic = prompt[:500]
+					} else {
+						notif.Topic = prompt
+					}
 				}
 				// Working directory from Reasonix payload (has "cwd" field)
 				if cwd, ok := hookData["cwd"].(string); ok && cwd != "" && notif.WorkDir == "" {
