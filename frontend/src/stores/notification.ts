@@ -13,6 +13,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const tool = ref('')
   const workDir = ref('')
   const topic = ref('')
+  const subagent = ref(false)
   const startedAt = ref(0)
   const elapsed = ref(0)
   let clearTimer: ReturnType<typeof setTimeout> | null = null
@@ -68,6 +69,7 @@ export const useNotificationStore = defineStore('notification', () => {
         source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
         if (notif.topic) topic.value = notif.topic
         if (notif.workDir) workDir.value = notif.workDir
+        subagent.value = false
         // Only reset timer on first start or new prompt during idle
         if (state.value !== 'running') {
           startedAt.value = Date.now()
@@ -75,8 +77,28 @@ export const useNotificationStore = defineStore('notification', () => {
         }
         state.value = 'running'
         message.value = ''
+        tool.value = ''
         startTicker()
         resetIdleTimer()
+        break
+
+      case 'claude-tool':
+      case 'reasonix-tool':
+        // PostToolUse: update current tool name (lightweight, no timer reset)
+        if (notif.tool) tool.value = notif.tool
+        if (state.value !== 'running') {
+          source.value = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
+          state.value = 'running'
+          startedAt.value = Date.now()
+          elapsed.value = 0
+          startTicker()
+          resetIdleTimer()
+        }
+        break
+
+      case 'claude-subagent':
+      case 'reasonix-subagent':
+        subagent.value = true
         break
 
       case 'claude-start':
@@ -131,6 +153,7 @@ export const useNotificationStore = defineStore('notification', () => {
     tool.value = ''
     workDir.value = ''
     topic.value = ''
+    subagent.value = false
     startedAt.value = 0
     elapsed.value = 0
     stopTicker()
@@ -145,5 +168,5 @@ export const useNotificationStore = defineStore('notification', () => {
     reset()
   }
 
-  return { state, source, message, tool, workDir, topic, elapsedText, handle, clear }
+  return { state, source, message, tool, workDir, topic, subagent, elapsedText, handle, clear }
 })

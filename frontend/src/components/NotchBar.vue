@@ -65,6 +65,10 @@ const emit = defineEmits<{
           <div class="claude-info">
             <span class="claude-text" v-if="notif.state === 'running'">
               {{ notif.topic || notif.tool || (notif.source === 'reasonix' ? 'Reasonix 运行中' : 'Claude 运行中') }}
+              <span v-if="notif.subagent" class="subagent-badge">⚡</span>
+            </span>
+            <span class="claude-text claude-tool" v-if="notif.state === 'running' && notif.topic && notif.tool">
+              {{ notif.tool }}
             </span>
             <span class="claude-text" v-else-if="notif.state === 'attention'">
               {{ notif.message || '需要关注' }}

@@ -222,6 +222,23 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.claude-tool {
+  color: var(--timo-text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.subagent-badge {
+  font-size: 11px;
+  margin-left: 4px;
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Traffic light — right side */
 .traffic-light {
   width: 20px;

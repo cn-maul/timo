@@ -359,6 +359,12 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 					"command": timoPath + ` notify --type reasonix-prompt --dir "$(pwd)"`,
 				},
 			},
+			"PostToolUse": []interface{}{
+				map[string]interface{}{
+					"match":   "*",
+					"command": timoPath + ` notify --type reasonix-tool`,
+				},
+			},
 			"Stop": []interface{}{
 				map[string]interface{}{
 					"command": timoPath + ` notify --type reasonix-done --msg "` + msgTaskComplete + `"`,
@@ -375,6 +381,28 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 					map[string]interface{}{
 						"type":    "command",
 						"command": timoPath + ` notify --type claude-prompt --dir "$(pwd)"`,
+					},
+				},
+			},
+		},
+		"PostToolUse": []interface{}{
+			map[string]interface{}{
+				"matcher": "*",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-tool`,
+					},
+				},
+			},
+		},
+		"SubagentStart": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-subagent`,
 					},
 				},
 			},
