@@ -332,6 +332,68 @@ func RunSetupReasonix() {
 	fmt.Printf("  Hooks: PreToolUse, Stop, Notification\n")
 }
 
+// buildHooksConfig builds the timo hooks entries for the given type prefix.
+// Reasonix uses flat format: {match, command}; Claude uses nested format: {matcher, hooks: [{type, command}]}.
+func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{} {
+	if typePrefix == "reasonix" {
+		// Reasonix flat format per DESKTOP_HOOKS spec
+		return map[string]interface{}{
+			"PreToolUse": []interface{}{
+				map[string]interface{}{
+					"match":   "*",
+					"command": timoPath + ` notify --type reasonix-start --dir "$(pwd)"`,
+				},
+			},
+			"Stop": []interface{}{
+				map[string]interface{}{
+					"command": timoPath + ` notify --type reasonix-done --msg "` + msgTaskComplete + `"`,
+				},
+			},
+			"Notification": []interface{}{
+				map[string]interface{}{
+					"command": timoPath + ` notify --type reasonix-notify --msg "` + msgConfirmNeeded + `"`,
+				},
+			},
+		}
+	}
+	// Claude Code nested format
+	return map[string]interface{}{
+		"PreToolUse": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-start --dir "$(pwd)"`,
+					},
+				},
+			},
+		},
+		"Stop": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-done --msg "` + msgTaskComplete + `"`,
+					},
+				},
+			},
+		},
+		"Notification": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-notify --msg "` + msgConfirmNeeded + `"`,
+					},
+				},
+			},
+		},
+	}
+}
+
 // installHooks is the shared implementation for setupHooks and setupReasonixHooks.
 // When isAuto is true, it skips configuration if timo hooks already exist.
 // It merges timo hooks into existing settings, preserving any non-timo hooks.
@@ -380,54 +442,41 @@ func installHooks(isAuto bool, configDir string, typePrefix string, successMsg s
 		}
 	}
 
-	// Build the desired timo hooks config
-	timoHooks := map[string]interface{}{
-		"PreToolUse": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type ` + typePrefix + `-start --dir "$(pwd)"`,
-					},
-				},
-			},
-		},
-		"Stop": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type ` + typePrefix + `-done --msg "` + msgTaskComplete + `"`,
-					},
-				},
-			},
-		},
-		"Notification": []interface{}{
-			map[string]interface{}{
-				"matcher": "",
-				"hooks": []interface{}{
-					map[string]interface{}{
-						"type":    "command",
-						"command": timoPath + ` notify --type ` + typePrefix + `-notify --msg "` + msgConfirmNeeded + `"`,
-					},
-				},
-			},
-		},
-	}
+	// Build the desired timo hooks config (format depends on target tool)
+	timoHooks := buildHooksConfig(timoPath, typePrefix)
 
 	// Merge: preserve non-timo hooks, replace timo hooks for each event type.
 	// For any event type not covered by timoHooks, existing entries are kept.
+	// Reasonix uses flat format {match, command}; Claude uses nested {matcher, hooks: [{type, command}]}.
+	isReasonix := typePrefix == "reasonix"
 	merged := make(map[string]interface{})
+
+	// helper: safely get or create a []interface{} from merged[event]
+	getSlice := func(key string) []interface{} {
+		if v, ok := merged[key].([]interface{}); ok {
+			return v
+		}
+		return nil
+	}
+
 	if existingHooks, ok := settings["hooks"].(map[string]interface{}); ok {
 		for event, existingRaw := range existingHooks {
 			if _, ok := timoHooks[event]; ok {
-				// This event type is managed by timo; filter out old timo entries,
-				// then append the new timo entry below.
+				// This event type is managed by timo; filter out old timo entries.
 				existingArr, _ := existingRaw.([]interface{})
 				for _, entry := range existingArr {
-					if m, ok := entry.(map[string]interface{}); ok {
+					m, ok := entry.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if isReasonix {
+						// Flat format: entry directly has {match, command}
+						if isTimoHook(m) {
+							continue // skip old timo entry
+						}
+						merged[event] = append(getSlice(event), m)
+					} else {
+						// Nested format: entry has {matcher, hooks: [{type, command}]}
 						entries, _ := m["hooks"].([]interface{})
 						kept := make([]interface{}, 0, len(entries))
 						for _, h := range entries {
@@ -437,7 +486,7 @@ func installHooks(isAuto bool, configDir string, typePrefix string, successMsg s
 						}
 						if len(kept) > 0 {
 							m["hooks"] = kept
-							merged[event] = append(merged[event].([]interface{}), m)
+							merged[event] = append(getSlice(event), m)
 						}
 					}
 				}
@@ -449,7 +498,7 @@ func installHooks(isAuto bool, configDir string, typePrefix string, successMsg s
 	}
 	// Append the timo hook entries for each managed event type.
 	for event, timoEntries := range timoHooks {
-		merged[event] = append(merged[event].([]interface{}), timoEntries.([]interface{})...)
+		merged[event] = append(getSlice(event), timoEntries.([]interface{})...)
 	}
 	settings["hooks"] = merged
 
