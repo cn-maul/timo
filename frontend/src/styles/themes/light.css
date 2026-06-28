@@ -1,0 +1,30 @@
+/* Timo — light theme */
+/* Applied via data-theme="light" on <html> */
+
+[data-theme="light"] {
+  --timo-bg: #f0f0f0;
+  --timo-text: #222;
+  --timo-text-secondary: #666;
+  --timo-surface: #ffffff;
+  --timo-surface-hover: #e8e8e8;
+  --timo-border: #ccc;
+  --timo-green: #16a34a;
+  --timo-yellow: #ca8a04;
+  --timo-red: #dc2626;
+  --timo-gray: #999;
+
+  /* Extended variables */
+  --timo-remaining-color: #888;
+  --timo-progress-bg: rgba(0, 0, 0, 0.08);
+  --timo-progress-fill: rgba(0, 0, 0, 0.4);
+  --timo-play-bg: rgba(0, 0, 0, 0.06);
+  --timo-play-hover: rgba(0, 0, 0, 0.12);
+  --timo-dir-color: #888;
+  --timo-tool-color: #999;
+  --timo-glow-green: rgba(22, 163, 74, 0.3);
+  --timo-glow-yellow: rgba(202, 138, 4, 0.3);
+  --timo-glow-red: rgba(220, 38, 38, 0.3);
+  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --timo-overlay-bg: rgba(0, 0, 0, 0.3);
+  --timo-backdrop-filter: none;
+}

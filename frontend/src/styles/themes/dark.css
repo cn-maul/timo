@@ -1,0 +1,31 @@
+/* Timo — dark theme (default) */
+/* Applied via data-theme="dark" on <html> */
+
+:root,
+[data-theme="dark"] {
+  --timo-bg: #000;
+  --timo-text: #fff;
+  --timo-text-secondary: #999;
+  --timo-surface: #1a1a1a;
+  --timo-surface-hover: #333;
+  --timo-border: #555;
+  --timo-green: #22c55e;
+  --timo-yellow: #eab308;
+  --timo-red: #ef4444;
+  --timo-gray: #666;
+
+  /* Extended variables */
+  --timo-remaining-color: #777;
+  --timo-progress-bg: rgba(255, 255, 255, 0.1);
+  --timo-progress-fill: rgba(255, 255, 255, 0.6);
+  --timo-play-bg: rgba(255, 255, 255, 0.12);
+  --timo-play-hover: rgba(255, 255, 255, 0.25);
+  --timo-dir-color: #555;
+  --timo-tool-color: #888;
+  --timo-glow-green: rgba(34, 197, 94, 0.4);
+  --timo-glow-yellow: rgba(234, 179, 8, 0.4);
+  --timo-glow-red: rgba(239, 68, 68, 0.4);
+  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --timo-overlay-bg: rgba(0, 0, 0, 0.5);
+  --timo-backdrop-filter: none;
+}

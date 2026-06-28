@@ -20,11 +20,52 @@ var assets embed.FS
 var mainApp *application.App
 var mainWindow *application.WebviewWindow
 
+// openSettings resizes the main notch window to 1/3 screen and shows settings.
+// Uses the same window — no separate window to manage, no create/destroy bugs.
+func openSettings() {
+	screen, err := mainWindow.GetScreen()
+	mainWindow.DisableSizeConstraints()
+
+	if err != nil || screen == nil {
+		mainWindow.SetURL("/?settings=1")
+		mainWindow.SetSize(400, 400)
+		mainWindow.SetPosition(0, 0)
+		return
+	}
+
+	sw := screen.Size.Width
+	sh := screen.Size.Height
+	w := sw / 3
+	h := sh / 3
+	x := (sw - w) / 2
+	y := (sh - h) / 2
+
+	// Save current notch state before switching
+	mainWindow.SetURL("/?settings=1")
+	mainWindow.SetSize(w, h)
+	mainWindow.SetPosition(x, y)
+}
+
+// closeSettings restores the main window to notch mode.
+func closeSettings() {
+	mainWindow.SetURL("/")
+	mainWindow.SetSize(600, 64)
+	// Center at top
+	screen, err := mainWindow.GetScreen()
+	if err == nil && screen != nil {
+		sw := screen.Size.Width
+		x := (sw - 600) / 2
+		mainWindow.SetPosition(x, 0)
+	}
+}
+
 func init() {
 	application.RegisterEvent[*media.MediaInfo]("media-update")
 	application.RegisterEvent[*Notification]("notification")
 	application.RegisterEvent[*SystemStats]("sys-stats")
+	application.RegisterEvent[*TimoSettings]("settings-updated")
 }
+
 
 func main() {
 	// CLI mode
@@ -86,6 +127,11 @@ func main() {
 	})
 	processMonitor.Start()
 
+	// Settings service
+	settingsService := NewSettingsService()
+	mainApp.RegisterService(application.NewService(settingsService))
+	registerSettingsEventHandlers(mainApp, settingsService)
+
 	// System stats poller (CPU + Memory)
 	sysPoller := NewSystemPoller(func(stats SystemStats) {
 		mainApp.Event.Emit("sys-stats", &stats)
@@ -97,7 +143,6 @@ func main() {
 		Height:           64,
 		Frameless:        true,
 		AlwaysOnTop:      true,
-		DisableResize:    true,
 		BackgroundType:   application.BackgroundTypeTransparent,
 		BackgroundColour: application.NewRGBA(0, 0, 0, 0),
 		InitialPosition:  application.WindowCentered,
@@ -137,6 +182,43 @@ func main() {
 			}
 			sysPoller.Start()
 		})
+	})
+
+	// System tray (right-click menu in notification area)
+	var tray *application.SystemTray
+	tray = setupSystemTray(
+		mainApp,
+		func() {
+			// toggle window visibility
+			if mainWindow.IsMinimised() || !mainWindow.IsVisible() {
+				mainWindow.Show()
+				mainWindow.Focus()
+			} else {
+				mainWindow.Minimise()
+			}
+		},
+		func() {
+			// open settings — resizes the main notch window to 1/3 screen
+			openSettings()
+		},
+		func() {
+			// quit
+			mainApp.Quit()
+		},
+	)
+
+	// Keep tray menu in sync when settings change
+	mainApp.Event.On("settings-updated", func(event *application.CustomEvent) {
+		if tray != nil {
+			if settings, ok := event.Data.(*TimoSettings); ok {
+				UpdateTrayStatus(tray, *settings)
+			}
+		}
+	})
+
+	// Close settings and restore notch mode
+	mainApp.Event.On("close-settings", func(event *application.CustomEvent) {
+		closeSettings()
 	})
 
 	// Defer cleanup so it runs even on panic

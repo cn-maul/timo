@@ -13,18 +13,45 @@ if [[ "$1" == "--clean" ]]; then
     info "Cleaned build artifacts"
 fi
 
+# ── Detect nvm and use a compatible Node version ──
+if [ -f "$HOME/.nvm/nvm.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$HOME/.nvm/nvm.sh"
+    # Check if current node meets Vite's requirement (>=20.19 or >=22.12)
+    NODE_VER=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)
+    if [ "$NODE_VER" -lt 22 ] 2>/dev/null; then
+        info "Node $NODE_VER detected, looking for v22+ via nvm..."
+        # Try to use the latest installed 22.x
+        if nvm ls 22 >/dev/null 2>&1; then
+            nvm use 22 >/dev/null 2>&1 && info "Switched to $(node --version) via nvm" || true
+        fi
+    fi
+fi
+
 # ── Check deps ──
 command -v go     >/dev/null 2>&1 || error "go not found"
 command -v node   >/dev/null 2>&1 || error "node not found"
 command -v npm    >/dev/null 2>&1 || error "npm not found"
 # wails3 may be in Go's bin directory (not always in $PATH)
 if ! command -v wails3 >/dev/null 2>&1; then
+    # Search common Go binary locations
     GOBIN=$(go env GOBIN 2>/dev/null)
     GOPATH_BIN=$(go env GOPATH 2>/dev/null)/bin
-    if [ -n "$GOBIN" ] && [ -f "$GOBIN/wails3" ]; then
-        export PATH="$GOBIN:$PATH"
-    elif [ -f "$GOPATH_BIN/wails3" ]; then
-        export PATH="$GOPATH_BIN:$PATH"
+    GOROOT_BIN=$(go env GOROOT 2>/dev/null)/bin
+    HOME_GO_BIN="$HOME/go/bin"
+    HOME_GO_WORKSPACE_BIN="$HOME/go-workspace/bin"
+    LOCAL_BIN="$HOME/.local/bin"
+
+    FOUND=""
+    for dir in "$GOBIN" "$GOPATH_BIN" "$GOROOT_BIN" "$HOME_GO_BIN" "$HOME_GO_WORKSPACE_BIN" "$LOCAL_BIN"; do
+        if [ -n "$dir" ] && [ -f "$dir/wails3" ]; then
+            FOUND="$dir"
+            break
+        fi
+    done
+
+    if [ -n "$FOUND" ]; then
+        export PATH="$FOUND:$PATH"
     else
         error "wails3 not found (go install github.com/wailsapp/wails/v3/cmd/wails3@latest)"
     fi

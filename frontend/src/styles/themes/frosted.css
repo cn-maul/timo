@@ -1,0 +1,30 @@
+/* Timo — frosted glass theme */
+/* Applied via data-theme="frosted" on <html> */
+
+[data-theme="frosted"] {
+  --timo-bg: transparent;
+  --timo-text: #fff;
+  --timo-text-secondary: rgba(255, 255, 255, 0.7);
+  --timo-surface: rgba(30, 30, 50, 0.55);
+  --timo-surface-hover: rgba(60, 60, 100, 0.4);
+  --timo-border: rgba(255, 255, 255, 0.15);
+  --timo-green: #4ade80;
+  --timo-yellow: #facc15;
+  --timo-red: #f87171;
+  --timo-gray: rgba(255, 255, 255, 0.4);
+
+  /* Extended variables */
+  --timo-remaining-color: rgba(255, 255, 255, 0.6);
+  --timo-progress-bg: rgba(255, 255, 255, 0.08);
+  --timo-progress-fill: rgba(255, 255, 255, 0.5);
+  --timo-play-bg: rgba(255, 255, 255, 0.15);
+  --timo-play-hover: rgba(255, 255, 255, 0.25);
+  --timo-dir-color: rgba(255, 255, 255, 0.45);
+  --timo-tool-color: rgba(255, 255, 255, 0.6);
+  --timo-glow-green: rgba(74, 222, 128, 0.5);
+  --timo-glow-yellow: rgba(250, 204, 21, 0.5);
+  --timo-glow-red: rgba(248, 113, 113, 0.5);
+  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --timo-overlay-bg: rgba(0, 0, 0, 0.3);
+  --timo-backdrop-filter: blur(20px) saturate(1.4);
+}

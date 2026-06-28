@@ -1,17 +1,24 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useMediaEvents } from '../composables/useMediaEvents'
 import { useNotificationEvents } from '../composables/useNotificationEvents'
 import { useSystemEvents } from '../composables/useSystemEvents'
+import { useSettingsStore } from '../stores/settings'
 import NotchBar from './NotchBar.vue'
 import DropPanel from './DropPanel.vue'
 
 const cleanupMedia = useMediaEvents()
 const cleanupNotification = useNotificationEvents()
 const cleanupSystem = useSystemEvents()
+const settings = useSettingsStore()
 
 const expanded = ref(false)
 let collapseTimer: ReturnType<typeof setTimeout> | null = null
+
+// Load settings from backend on mount
+onMounted(() => {
+  settings.load()
+})
 
 function toggle() {
   expanded.value = !expanded.value

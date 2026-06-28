@@ -3,11 +3,22 @@ import { computed, ref, onBeforeUnmount } from 'vue'
 import { useMediaStore, formatTime } from '../stores/media'
 import { useNotificationStore } from '../stores/notification'
 import { useSystemStore } from '../stores/system'
+import { useSettingsStore } from '../stores/settings'
+import { useActiveMode } from '../composables/useActiveMode'
 import WaveformBars from './WaveformBars.vue'
 
 const media = useMediaStore()
 const notif = useNotificationStore()
 const sys = useSystemStore()
+const settings = useSettingsStore()
+
+// Priority-aware active mode
+const activeMode = useActiveMode(
+  () => settings.displayPriority,
+  () => notif.state,
+  () => media.hasMedia,
+  () => settings.idleDisplay,
+)
 
 const titleText = computed(() => {
   if (!media.hasMedia) return ''
@@ -21,8 +32,6 @@ const remainingText = computed(() => {
   const remain = Math.max(0, media.durationMs - media.positionMs)
   return `-${formatTime(remain)}`
 })
-
-const hasAIActivity = computed(() => notif.state !== '')
 
 // Current time for idle display
 const now = ref(new Date())
@@ -67,8 +76,8 @@ const emit = defineEmits<{
 
 <template>
   <div class="notch-bar" @click="emit('toggle')">
-    <!-- Claude status -->
-    <template v-if="hasAIActivity">
+    <!-- AI mode -->
+    <template v-if="activeMode === 'ai'">
       <div class="notch-content">
         <div class="notch-left">
           <img :src="notif.source === 'reasonix' ? '/reasonix.png' : '/claude.png'" class="claude-logo" :alt="notif.source === 'reasonix' ? 'Reasonix' : 'Claude'" />
@@ -106,8 +115,8 @@ const emit = defineEmits<{
       </div>
     </template>
 
-    <!-- Media -->
-    <template v-else-if="media.hasMedia">
+    <!-- Media mode -->
+    <template v-else-if="activeMode === 'media'">
       <div class="notch-content">
         <div class="notch-left">
           <img v-if="media.coverUrl" :src="media.coverUrl" class="notch-cover" alt="" />
@@ -131,15 +140,15 @@ const emit = defineEmits<{
       </div>
     </template>
 
-    <!-- Idle: CPU + Mem + Clock -->
-    <template v-else>
+    <!-- Idle mode: conditional CPU / Mem / Clock based on idleDisplay setting -->
+    <template v-else-if="activeMode === 'idle'">
       <div class="notch-content">
         <div class="notch-left">
-          <span class="sys-stat">
+          <span class="sys-stat" v-if="settings.idleDisplay === 'all' || settings.idleDisplay === 'cpu'">
             <span class="sys-label">CPU</span>
             <span class="sys-value">{{ cpuText }}</span>
           </span>
-          <span class="sys-stat">
+          <span class="sys-stat" v-if="settings.idleDisplay === 'all' || settings.idleDisplay === 'mem'">
             <span class="sys-label">MEM</span>
             <span class="sys-value">{{ memText }}</span>
           </span>
@@ -149,5 +158,7 @@ const emit = defineEmits<{
         </div>
       </div>
     </template>
+
+    <!-- none mode: show nothing (v-else covers activeMode === 'none') -->
   </div>
 </template>
