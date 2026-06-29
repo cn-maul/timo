@@ -149,6 +149,126 @@ func (p *LinuxProvider) Pause() error    { return p.callPlayerMethod("Pause") }
 func (p *LinuxProvider) Next() error     { return p.callPlayerMethod("Next") }
 func (p *LinuxProvider) Previous() error { return p.callPlayerMethod("Previous") }
 
+// SeekTo jumps to the specified position in milliseconds.
+func (p *LinuxProvider) SeekTo(positionMs int64) error {
+	obj, err := p.getPlayerObject()
+	if err != nil {
+		return err
+	}
+	// MPRIS uses microseconds for position
+	positionUs := positionMs * 1000
+	return obj.Call(mprisPlayerIface+".SetPosition", 0, dbus.ObjectPath("/org/mpris/MediaPlayer2"), positionUs).Err
+}
+
+// SetShuffle enables or disables shuffle mode.
+func (p *LinuxProvider) SetShuffle(enabled bool) error {
+	obj, err := p.getPlayerObject()
+	if err != nil {
+		return err
+	}
+	return obj.Call(mprisPlayerIface+".SetShuffle", 0, enabled).Err
+}
+
+// SetRepeat sets the repeat mode.
+// mode: 0 = None, 1 = One, 2 = All
+func (p *LinuxProvider) SetRepeat(mode int) error {
+	obj, err := p.getPlayerObject()
+	if err != nil {
+		return err
+	}
+	// MPRIS RepeatMode: "None", "Track", "Playlist"
+	var repeatMode string
+	switch mode {
+	case 0:
+		repeatMode = "None"
+	case 1:
+		repeatMode = "Track"
+	case 2:
+		repeatMode = "Playlist"
+	default:
+		repeatMode = "None"
+	}
+	return obj.Call(mprisPlayerIface+".SetRepeatMode", 0, repeatMode).Err
+}
+
+// GetSessions returns all active MPRIS sessions.
+func (p *LinuxProvider) GetSessions() ([]MediaSession, error) {
+	var names []string
+	err := p.conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list bus names: %w", err)
+	}
+
+	var sessions []MediaSession
+	for _, name := range names {
+		if strings.HasPrefix(name, mprisPrefix) && name != mprisPrefix+"d" {
+			obj := p.conn.Object(name, dbus.ObjectPath(mprisObject))
+
+			// Get playback status
+			playing := false
+			statusVar, err := obj.GetProperty(mprisPlayerIface + ".PlaybackStatus")
+			if err == nil {
+				if status, ok := statusVar.Value().(string); ok {
+					playing = status == "Playing"
+				}
+			}
+
+			// Extract app name from MPRIS bus name
+			appName := strings.TrimPrefix(name, mprisPrefix)
+
+			sessions = append(sessions, MediaSession{
+				ID:       name,
+				Name:     appName,
+				Playing:  playing,
+				Priority: len(sessions),
+			})
+		}
+	}
+	return sessions, nil
+}
+
+// GetCapabilities returns what operations the current player supports.
+func (p *LinuxProvider) GetCapabilities() (*MediaCapabilities, error) {
+	obj, err := p.getPlayerObject()
+	if err != nil {
+		return &MediaCapabilities{}, err
+	}
+
+	cap := &MediaCapabilities{}
+
+	// Check capabilities via properties
+	canSeekVar, err := obj.GetProperty(mprisPlayerIface + ".CanSeek")
+	if err == nil {
+		cap.CanSeek, _ = canSeekVar.Value().(bool)
+	}
+
+	canGoNextVar, err := obj.GetProperty(mprisPlayerIface + ".CanGoNext")
+	if err == nil {
+		cap.CanNext, _ = canGoNextVar.Value().(bool)
+	}
+
+	canGoPreviousVar, err := obj.GetProperty(mprisPlayerIface + ".CanGoPrevious")
+	if err == nil {
+		cap.CanPrevious, _ = canGoPreviousVar.Value().(bool)
+	}
+
+	canPlayVar, err := obj.GetProperty(mprisPlayerIface + ".CanPlay")
+	if err == nil {
+		cap.CanPlay, _ = canPlayVar.Value().(bool)
+	}
+
+	canPauseVar, err := obj.GetProperty(mprisPlayerIface + ".CanPause")
+	if err == nil {
+		cap.CanPause, _ = canPauseVar.Value().(bool)
+	}
+
+	// Shuffle and Repeat are typically supported by MPRIS players
+	cap.CanShuffle = true
+	cap.CanRepeat = true
+
+	return cap, nil
+}
+
 func (p *LinuxProvider) Close() {
 	if p.conn != nil {
 		p.conn.Close()
