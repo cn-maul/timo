@@ -26,7 +26,7 @@ const pages = [
 // Display settings
 const localPriority = ref<string[]>(['ai', 'media'])
 const localIdleDisplay = ref<'all' | 'cpu' | 'mem' | 'net' | 'none'>('all')
-const localTheme = ref<'dark' | 'light'>('dark')
+const localTheme = ref<'dark' | 'light' | 'frosted'>('dark')
 
 // New display options
 const localShowToolContext = ref(true)
@@ -38,8 +38,8 @@ const localNetUnit = ref<'kb' | 'mb' | 'auto'>('auto')
 
 // Hooks settings
 const hooksStatus = ref({
-  claude: { installed: false, path: '' },
-  reasonix: { installed: false, path: '' },
+  claude: { installed: false, path: '', pathMismatch: false, currentPath: '' },
+  reasonix: { installed: false, path: '', pathMismatch: false, currentPath: '' },
 })
 const hooksLoading = ref(false)
 const hooksFeedback = ref('')
@@ -250,6 +250,10 @@ function onDragStart(e: MouseEvent) {
                   <div class="theme-preview theme-preview-light"></div>
                   <span>浅色</span>
                 </div>
+                <div class="theme-card" :class="{ active: localTheme === 'frosted' }" @click="localTheme = 'frosted'">
+                  <div class="theme-preview theme-preview-frosted"></div>
+                  <span>磨砂</span>
+                </div>
               </div>
             </div>
 
@@ -328,11 +332,14 @@ function onDragStart(e: MouseEvent) {
                   <div class="hook-header">
                     <span class="hook-icon">🤖</span>
                     <span class="hook-name">Claude Code</span>
-                    <span class="hook-status" :class="{ installed: hooksStatus.claude.installed }">
-                      {{ hooksStatus.claude.installed ? '✓ 已安装' : '未安装' }}
+                    <span class="hook-status" :class="{ installed: hooksStatus.claude.installed && !hooksStatus.claude.pathMismatch, warning: hooksStatus.claude.pathMismatch }">
+                      {{ hooksStatus.claude.pathMismatch ? '⚠️ 路径变更' : (hooksStatus.claude.installed ? '✓ 已安装' : '未安装') }}
                     </span>
                   </div>
                   <div class="hook-path" v-if="hooksStatus.claude.path">{{ hooksStatus.claude.path }}</div>
+                  <div class="hook-warning" v-if="hooksStatus.claude.pathMismatch">
+                    Hooks 指向旧路径，建议重新注入以更新到当前路径
+                  </div>
                   <div class="hook-actions">
                     <button class="btn btn-small" @click="injectHook('claude')" :disabled="hooksLoading">
                       {{ hooksStatus.claude.installed ? '重新注入' : '注入' }}
@@ -348,11 +355,14 @@ function onDragStart(e: MouseEvent) {
                   <div class="hook-header">
                     <span class="hook-icon">🧠</span>
                     <span class="hook-name">Reasonix</span>
-                    <span class="hook-status" :class="{ installed: hooksStatus.reasonix.installed }">
-                      {{ hooksStatus.reasonix.installed ? '✓ 已安装' : '未安装' }}
+                    <span class="hook-status" :class="{ installed: hooksStatus.reasonix.installed && !hooksStatus.reasonix.pathMismatch, warning: hooksStatus.reasonix.pathMismatch }">
+                      {{ hooksStatus.reasonix.pathMismatch ? '⚠️ 路径变更' : (hooksStatus.reasonix.installed ? '✓ 已安装' : '未安装') }}
                     </span>
                   </div>
                   <div class="hook-path" v-if="hooksStatus.reasonix.path">{{ hooksStatus.reasonix.path }}</div>
+                  <div class="hook-warning" v-if="hooksStatus.reasonix.pathMismatch">
+                    Hooks 指向旧路径，建议重新注入以更新到当前路径
+                  </div>
                   <div class="hook-actions">
                     <button class="btn btn-small" @click="injectHook('reasonix')" :disabled="hooksLoading">
                       {{ hooksStatus.reasonix.installed ? '重新注入' : '注入' }}
@@ -654,6 +664,11 @@ function onDragStart(e: MouseEvent) {
   background: linear-gradient(135deg, #f0f0f0 50%, #ffffff 50%);
 }
 
+.theme-preview-frosted {
+  background: linear-gradient(135deg, rgba(255,255,255,0.3) 50%, rgba(200,200,200,0.2) 50%);
+  backdrop-filter: blur(10px);
+}
+
 .toggle-list {
   display: flex;
   flex-direction: column;
@@ -756,6 +771,20 @@ function onDragStart(e: MouseEvent) {
 
 .hook-status.installed {
   color: var(--timo-green);
+}
+
+.hook-status.warning {
+  color: var(--timo-yellow);
+}
+
+.hook-warning {
+  font-size: 12px;
+  color: var(--timo-yellow);
+  background: rgba(255, 200, 0, 0.1);
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin: 8px 0;
+  border-left: 3px solid var(--timo-yellow);
 }
 
 .hook-path {

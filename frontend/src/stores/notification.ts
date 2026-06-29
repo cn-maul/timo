@@ -199,6 +199,43 @@ export const useNotificationStore = defineStore('notification', () => {
   // Tool history for progress tracking
   const toolHistory = ref<Array<{ tool: string; target: string; duration: number }>>([])
 
+  // Tool summary for stop event
+  const toolSummary = computed(() => {
+    if (toolHistory.value.length === 0) return ''
+
+    // Count tools by type
+    const counts: Record<string, number> = {}
+    const fileTools = new Set<string>()
+
+    for (const h of toolHistory.value) {
+      counts[h.tool] = (counts[h.tool] || 0) + 1
+      // Track file operations
+      if ((h.tool === 'Edit' || h.tool === 'Write' || h.tool === 'Read') && h.target) {
+        fileTools.add(h.target)
+      }
+    }
+
+    // Build summary string
+    const parts: string[] = []
+    const totalTools = toolHistory.value.length
+    parts.push(`${totalTools} 个工具`)
+
+    // Highlight file operations
+    if (fileTools.size > 0) {
+      parts.push(`${fileTools.size} 个文件`)
+    }
+
+    // Mention specific tool types if significant
+    if (counts['Bash'] && counts['Bash'] > 2) {
+      parts.push(`${counts['Bash']} 条命令`)
+    }
+    if (counts['Agent'] && counts['Agent'] > 0) {
+      parts.push(`${counts['Agent']} 个子代理`)
+    }
+
+    return parts.join('、')
+  })
+
   function startTicker() {
     stopTicker()
     tickTimer = setInterval(() => {
@@ -339,10 +376,17 @@ export const useNotificationStore = defineStore('notification', () => {
       case 'claude-stop':
       case 'reasonix-stop':
         // Stop event from hook - Claude finished responding
-        // Use last_assistant_message as summary if available
+        // Generate summary with tool stats
         state.value = 'done'
-        finalMsg.value = notif.finalMsg || notif.agentResult || notif.message || '任务完成'
-        message.value = finalMsg.value
+        const baseMsg = notif.finalMsg || notif.agentResult || notif.message || '任务完成'
+        const summary = toolSummary.value
+        if (summary) {
+          finalMsg.value = `${baseMsg} · ${summary}`
+          message.value = finalMsg.value
+        } else {
+          finalMsg.value = baseMsg
+          message.value = baseMsg
+        }
         stopTicker()
         clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
         break
@@ -459,6 +503,7 @@ export const useNotificationStore = defineStore('notification', () => {
     agentTypeName,
     primaryText,
     secondaryText,
+    toolSummary,
     // History
     toolHistory,
     // Methods

@@ -520,8 +520,8 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 			},
 		}
 	}
-	// Claude Code nested format
-	// No Stop/SessionEnd hooks — ProcessMonitor detects process exit (handles multiple instances)
+	// Claude Code nested format (matches reasonix event set)
+	// ProcessMonitor serves as backup for process exit detection.
 	return map[string]interface{}{
 		"UserPromptSubmit": []interface{}{
 			map[string]interface{}{
@@ -733,8 +733,10 @@ type HooksStatus struct {
 }
 
 type HookInfo struct {
-	Installed bool   `json:"installed"`
-	Path      string `json:"path"`
+	Installed    bool   `json:"installed"`
+	Path         string `json:"path"`
+	PathMismatch bool   `json:"pathMismatch,omitempty"`  // hooks exist but point to different timo
+	CurrentPath  string `json:"currentPath,omitempty"`   // current timo binary path
 }
 
 // getHooksStatus checks whether hooks are installed for Claude Code and Reasonix.
@@ -746,6 +748,7 @@ func getHooksStatus() HooksStatus {
 }
 
 // checkHookInstalled reads the settings file and checks for timo hooks.
+// Also checks if the hooks point to the current timo binary path.
 func checkHookInstalled(configDir string) HookInfo {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -764,16 +767,33 @@ func checkHookInstalled(configDir string) HookInfo {
 	}
 
 	installed := false
+	pathMismatch := false
+	currentTimoPath := ""
+
+	// Get current timo binary path
+	if execPath, err := os.Executable(); err == nil {
+		if absPath, err := filepath.Abs(execPath); err == nil {
+			currentTimoPath = absPath
+		}
+	}
+
 	if hooksRaw, ok := settings["hooks"]; ok {
 		hooksJSON, _ := json.Marshal(hooksRaw)
-		if strings.Contains(string(hooksJSON), "timo notify") {
+		hooksStr := string(hooksJSON)
+		if strings.Contains(hooksStr, "timo notify") {
 			installed = true
+			// Check if the path matches current timo
+			if currentTimoPath != "" && !strings.Contains(hooksStr, currentTimoPath) {
+				pathMismatch = true
+			}
 		}
 	}
 
 	return HookInfo{
-		Installed: installed,
-		Path:      settingsPath,
+		Installed:    installed,
+		Path:         settingsPath,
+		PathMismatch: pathMismatch,
+		CurrentPath:  currentTimoPath,
 	}
 }
 

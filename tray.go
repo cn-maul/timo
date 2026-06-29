@@ -29,7 +29,7 @@ func setupSystemTray(
 		tray.SetIcon(iconData)
 	}
 
-	// Build right-click menu
+	// Build initial menu
 	menu := application.NewMenu()
 
 	menu.Add("显示/隐藏 Timo").OnClick(func(ctx *application.Context) {
@@ -42,12 +42,35 @@ func setupSystemTray(
 
 	menu.AddSeparator()
 
-	// Read-only status items (informational, not clickable)
-	statusPriority := menu.Add("优先级: AI > 媒体")
-	statusPriority.SetEnabled(false)
-
-	statusTheme := menu.Add("主题: 深色")
-	statusTheme.SetEnabled(false)
+	// Theme submenu (clickable)
+	themeMenu := menu.AddSubmenu("主题")
+	themeMenu.Add("深色").OnClick(func(ctx *application.Context) {
+		settings, _ := LoadSettings()
+		settings.Theme = "dark"
+		SaveSettings(settings)
+		if mainApp != nil {
+			mainApp.Event.Emit("settings-loaded", &settings)
+		}
+		UpdateTrayStatus(tray, settings)
+	})
+	themeMenu.Add("浅色").OnClick(func(ctx *application.Context) {
+		settings, _ := LoadSettings()
+		settings.Theme = "light"
+		SaveSettings(settings)
+		if mainApp != nil {
+			mainApp.Event.Emit("settings-loaded", &settings)
+		}
+		UpdateTrayStatus(tray, settings)
+	})
+	themeMenu.Add("磨砂").OnClick(func(ctx *application.Context) {
+		settings, _ := LoadSettings()
+		settings.Theme = "frosted"
+		SaveSettings(settings)
+		if mainApp != nil {
+			mainApp.Event.Emit("settings-loaded", &settings)
+		}
+		UpdateTrayStatus(tray, settings)
+	})
 
 	menu.AddSeparator()
 
@@ -61,15 +84,12 @@ func setupSystemTray(
 	return tray
 }
 
-// UpdateTrayStatus updates the read-only status items in the tray menu to
-// reflect current settings. Called when settings change.
+// UpdateTrayStatus rebuilds the tray menu to reflect current settings.
+// Called when settings change.
 func UpdateTrayStatus(tray *application.SystemTray, settings TimoSettings) {
-	// Rebuild the entire menu since Wails v3 MenuItems don't have a simple
-	// "update label" API that works across all platforms.
 	menu := application.NewMenu()
 
 	menu.Add("显示/隐藏 Timo").OnClick(func(ctx *application.Context) {
-		// toggle window
 		if mainWindow != nil {
 			if mainWindow.IsMinimised() || !mainWindow.IsVisible() {
 				mainWindow.Show()
@@ -87,36 +107,50 @@ func UpdateTrayStatus(tray *application.SystemTray, settings TimoSettings) {
 
 	menu.AddSeparator()
 
-	// Build priority label
-	priorityLabels := map[string]string{
-		"ai":    "AI 编码",
-		"media": "媒体播放",
-	}
-	var priorityStr string
-	for i, p := range settings.DisplayPriority {
-		if i > 0 {
-			priorityStr += " > "
-		}
-		if label, ok := priorityLabels[p]; ok {
-			priorityStr += label
-		} else {
-			priorityStr += p
-		}
-	}
-	si := menu.Add("优先级: " + priorityStr)
-	si.SetEnabled(false)
+	// Theme submenu with checkmarks
+	themeMenu := menu.AddSubmenu("主题")
 
-	themeLabels := map[string]string{
-		"dark":    "深色",
-		"light":   "浅色",
-		"frosted": "磨砂",
+	darkItem := themeMenu.Add("深色")
+	if settings.Theme == "dark" {
+		darkItem.SetChecked(true)
 	}
-	themeLabel := "深色"
-	if l, ok := themeLabels[settings.Theme]; ok {
-		themeLabel = l
+	darkItem.OnClick(func(ctx *application.Context) {
+		s, _ := LoadSettings()
+		s.Theme = "dark"
+		SaveSettings(s)
+		if mainApp != nil {
+			mainApp.Event.Emit("settings-loaded", &s)
+		}
+		UpdateTrayStatus(tray, s)
+	})
+
+	lightItem := themeMenu.Add("浅色")
+	if settings.Theme == "light" {
+		lightItem.SetChecked(true)
 	}
-	si2 := menu.Add("主题: " + themeLabel)
-	si2.SetEnabled(false)
+	lightItem.OnClick(func(ctx *application.Context) {
+		s, _ := LoadSettings()
+		s.Theme = "light"
+		SaveSettings(s)
+		if mainApp != nil {
+			mainApp.Event.Emit("settings-loaded", &s)
+		}
+		UpdateTrayStatus(tray, s)
+	})
+
+	frostedItem := themeMenu.Add("磨砂")
+	if settings.Theme == "frosted" {
+		frostedItem.SetChecked(true)
+	}
+	frostedItem.OnClick(func(ctx *application.Context) {
+		s, _ := LoadSettings()
+		s.Theme = "frosted"
+		SaveSettings(s)
+		if mainApp != nil {
+			mainApp.Event.Emit("settings-loaded", &s)
+		}
+		UpdateTrayStatus(tray, s)
+	})
 
 	menu.AddSeparator()
 

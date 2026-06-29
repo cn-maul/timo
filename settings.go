@@ -44,6 +44,9 @@ type TimoSettings struct {
 	// ShowSubagentDetails controls whether to show subagent type and description.
 	// When true, displays agent type (Explore, Plan, etc.) and task description.
 	ShowSubagentDetails bool `json:"showSubagentDetails"`
+
+	// Hotkeys holds the global hotkey configuration.
+	Hotkeys HotkeyConfig `json:"hotkeys"`
 }
 
 // DefaultSettings returns the factory-default settings.
@@ -110,6 +113,32 @@ func LoadSettings() (TimoSettings, error) {
 	}
 	if !hasField(data, "showSubagentDetails") {
 		s.ShowSubagentDetails = def.ShowSubagentDetails
+	}
+	// Hotkeys default
+	if !hasField(data, "hotkeys") {
+		s.Hotkeys = DefaultHotkeyConfig()
+	} else {
+		// Fill in missing hotkey fields with defaults
+		hkDef := DefaultHotkeyConfig()
+		if s.Hotkeys.ToggleWindow == "" {
+			s.Hotkeys.ToggleWindow = hkDef.ToggleWindow
+		}
+		if s.Hotkeys.ToggleMedia == "" {
+			s.Hotkeys.ToggleMedia = hkDef.ToggleMedia
+		}
+		// Enabled defaults to true unless explicitly set false — but since
+		// missing struct fields are zero (false), we check the raw data.
+		var raw struct {
+			Hotkeys struct {
+				Enabled bool `json:"enabled"`
+			} `json:"hotkeys"`
+		}
+		json.Unmarshal(data, &raw)
+		if !hasField(data, "hotkeys") {
+			s.Hotkeys.Enabled = hkDef.Enabled
+		} else {
+			s.Hotkeys.Enabled = raw.Hotkeys.Enabled || s.Hotkeys.Enabled
+		}
 	}
 	return s, nil
 }

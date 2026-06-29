@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -72,6 +73,24 @@ func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 	}
 	if v, ok := m["showSubagentDetails"].(bool); ok {
 		s.ShowSubagentDetails = v
+	}
+
+	// Hotkeys config
+	if hkRaw, ok := m["hotkeys"]; ok {
+		var rawHotkey struct {
+			Enabled bool `json:"enabled"`
+			ToggleWindow string `json:"toggleWindow"`
+			ToggleMedia string `json:"toggleMedia"`
+		}
+		hkJSON, err := json.Marshal(hkRaw)
+		if err == nil && string(hkJSON) != "null" {
+			json.Unmarshal(hkJSON, &rawHotkey)
+			s.Hotkeys.Enabled = rawHotkey.Enabled
+			s.Hotkeys.ToggleWindow = rawHotkey.ToggleWindow
+			s.Hotkeys.ToggleMedia = rawHotkey.ToggleMedia
+		} else if !rawHotkey.Enabled {
+			s.Hotkeys.Enabled = true // default on for backward compatibility
+		}
 	}
 
 	return &s

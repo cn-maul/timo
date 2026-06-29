@@ -5,7 +5,7 @@ import { Events } from '@wailsio/runtime'
 export interface TimoSettings {
   displayPriority: string[]
   idleDisplay: 'all' | 'cpu' | 'mem' | 'net' | 'none'
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'frosted'
   showToolContext: boolean
   showToolProgress: boolean
   showSubagentDetails: boolean
@@ -25,7 +25,7 @@ function defaultSettings(): TimoSettings {
 export const useSettingsStore = defineStore('settings', () => {
   const displayPriority = ref<string[]>(['ai', 'media'])
   const idleDisplay = ref<'all' | 'cpu' | 'mem' | 'net' | 'none'>('all')
-  const theme = ref<'dark' | 'light'>('dark')
+  const theme = ref<'dark' | 'light' | 'frosted'>('dark')
   const loaded = ref(false)
 
   // New display options

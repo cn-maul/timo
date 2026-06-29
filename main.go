@@ -153,12 +153,14 @@ func main() {
 	}
 
 	var poller *media.Poller
+	var mediaSvc *MediaService
 	if provider != nil {
 		emitter := func(info *media.MediaInfo) {
 			mainApp.Event.Emit("media-update", info)
 		}
 		poller = media.NewPoller(provider, emitter, 1*time.Second)
-		mainApp.RegisterService(application.NewService(NewMediaService(poller)))
+		mediaSvc = NewMediaService(poller)
+		mainApp.RegisterService(application.NewService(mediaSvc))
 	}
 
 	// Notification server (for Claude Code / Reasonix hooks)
@@ -266,6 +268,38 @@ func main() {
 		}
 	})
 
+	// Global/app-level hotkeys
+	initialSettings, _ := LoadSettings()
+	hotkeyManager, hotkeyErr := NewGlobalHotkeyManager()
+	if hotkeyErr != nil {
+		log.Printf("timo: hotkey manager unavailable: %v", hotkeyErr)
+	}
+	if hotkeyManager != nil {
+		// Toggle window hotkey
+		if initialSettings.Hotkeys.Enabled && initialSettings.Hotkeys.ToggleWindow != "" {
+			hotkeyManager.Register(initialSettings.Hotkeys.ToggleWindow, func() {
+				if mainWindow.IsMinimised() || !mainWindow.IsVisible() {
+					mainWindow.Show()
+					mainWindow.Focus()
+				} else {
+					mainWindow.Minimise()
+				}
+			})
+		}
+		// Toggle media hotkey
+		if initialSettings.Hotkeys.Enabled && initialSettings.Hotkeys.ToggleMedia != "" && mediaSvc != nil {
+			hotkeyManager.Register(initialSettings.Hotkeys.ToggleMedia, func() {
+				// Simple toggle: try play, if fails try pause
+				if err := mediaSvc.Play(); err != nil {
+					mediaSvc.Pause()
+				}
+			})
+		}
+		hotkeyManager.logStatus()
+		// Wire app-level keybindings (work when window has focus)
+		setupAppHotkeys(mainApp, &initialSettings, hotkeyManager)
+	}
+
 	// Open settings from tray (after menu rebuild) and other sources
 	mainApp.Event.On("open-settings", func(event *application.CustomEvent) {
 		openSettings()
@@ -359,5 +393,32 @@ func main() {
 
 	if err := mainApp.Run(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// setupAppHotkeys registers Wails app-level keybindings that work when
+// the Timo window has focus. For system-wide hotkeys, the GlobalHotkeyManager
+// handles registration via D-Bus/X11.
+func setupAppHotkeys(app *application.App, settings *TimoSettings, hkm *GlobalHotkeyManager) {
+	if settings == nil || !settings.Hotkeys.Enabled {
+		return
+	}
+
+	// Toggle window
+	if settings.Hotkeys.ToggleWindow != "" {
+		app.KeyBinding.Add(settings.Hotkeys.ToggleWindow, func(w application.Window) {
+			if hkm != nil {
+				hkm.Trigger(settings.Hotkeys.ToggleWindow)
+			}
+		})
+	}
+
+	// Toggle media
+	if settings.Hotkeys.ToggleMedia != "" {
+		app.KeyBinding.Add(settings.Hotkeys.ToggleMedia, func(w application.Window) {
+			if hkm != nil {
+				hkm.Trigger(settings.Hotkeys.ToggleMedia)
+			}
+		})
 	}
 }

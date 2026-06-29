@@ -9,6 +9,10 @@ export interface SystemStats {
   netDownKBps: number
   netUpKBps: number
   localIP: string
+  diskReadKBps: number
+  diskWriteKBps: number
+  gpuPercent: number
+  gpuTemp: number
 }
 
 export const useSystemStore = defineStore('system', () => {
@@ -19,6 +23,10 @@ export const useSystemStore = defineStore('system', () => {
   const netDownKBps = ref(0)
   const netUpKBps = ref(0)
   const localIP = ref('')
+  const diskReadKBps = ref(0)
+  const diskWriteKBps = ref(0)
+  const gpuPercent = ref(0)
+  const gpuTemp = ref(0)
 
   function update(stats: SystemStats) {
     cpuPercent.value = stats.cpuPercent
@@ -28,11 +36,16 @@ export const useSystemStore = defineStore('system', () => {
     netDownKBps.value = stats.netDownKBps
     netUpKBps.value = stats.netUpKBps
     localIP.value = stats.localIP
+    diskReadKBps.value = stats.diskReadKBps || 0
+    diskWriteKBps.value = stats.diskWriteKBps || 0
+    gpuPercent.value = stats.gpuPercent || 0
+    gpuTemp.value = stats.gpuTemp || 0
   }
 
   return {
     cpuPercent, memPercent, memUsedGB, memTotalGB,
     netDownKBps, netUpKBps, localIP,
+    diskReadKBps, diskWriteKBps, gpuPercent, gpuTemp,
     update
   }
 })

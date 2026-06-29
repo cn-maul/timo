@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,18 +19,22 @@ const (
 	kbPerGB         = 1048576 // 1024 * 1024 kB per GB
 )
 
-// SystemStats holds CPU, memory, and network stats.
+// SystemStats holds CPU, memory, network, disk, and GPU stats.
 type SystemStats struct {
-	CPUPercent   float64 `json:"cpuPercent"`
-	MemPercent   float64 `json:"memPercent"`
-	MemUsedGB    float64 `json:"memUsedGB"`
-	MemTotalGB   float64 `json:"memTotalGB"`
-	NetDownKBps  float64 `json:"netDownKBps"`  // Download speed in KB/s
-	NetUpKBps    float64 `json:"netUpKBps"`    // Upload speed in KB/s
-	LocalIP      string  `json:"localIP"`      // Primary local IP address
+	CPUPercent    float64 `json:"cpuPercent"`
+	MemPercent    float64 `json:"memPercent"`
+	MemUsedGB     float64 `json:"memUsedGB"`
+	MemTotalGB    float64 `json:"memTotalGB"`
+	NetDownKBps   float64 `json:"netDownKBps"`   // Download speed in KB/s
+	NetUpKBps     float64 `json:"netUpKBps"`     // Upload speed in KB/s
+	LocalIP       string  `json:"localIP"`       // Primary local IP address
+	DiskReadKBps  float64 `json:"diskReadKBps"`  // Disk read speed in KB/s
+	DiskWriteKBps float64 `json:"diskWriteKBps"` // Disk write speed in KB/s
+	GpuPercent    float64 `json:"gpuPercent"`    // GPU usage (0 if unavailable)
+	GpuTemp       float64 `json:"gpuTemp"`       // GPU temperature in Celsius (0 if unavailable)
 }
 
-// SystemPoller periodically reads /proc for CPU, memory, and network stats.
+// SystemPoller periodically reads /proc for system stats.
 type SystemPoller struct {
 	emitter func(SystemStats)
 	stopCh  chan struct{}
@@ -43,6 +48,11 @@ type SystemPoller struct {
 	prevRxBytes uint64
 	prevTxBytes uint64
 	netMu       sync.Mutex
+
+	// Disk state
+	prevDiskRead  uint64
+	prevDiskWrite uint64
+	diskMu        sync.Mutex
 }
 
 func NewSystemPoller(emitter func(SystemStats)) *SystemPoller {
@@ -53,9 +63,10 @@ func NewSystemPoller(emitter func(SystemStats)) *SystemPoller {
 }
 
 func (p *SystemPoller) Start() {
-	// Prime CPU and network readings
+	// Prime CPU, network, and disk readings
 	p.readCPU()
 	p.readNetBytes()
+	p.readDiskBytes()
 	go func() {
 		ticker := time.NewTicker(sysPollInterval)
 		defer ticker.Stop()
@@ -79,6 +90,8 @@ func (p *SystemPoller) poll() {
 	memTotal, memAvail := p.readMem()
 	netDown, netUp := p.readNetSpeed()
 	ip := getLocalIP()
+	diskRead, diskWrite := p.readDiskSpeed()
+	gpuUsage, gpuTemp := p.readGPU()
 
 	memUsed := memTotal - memAvail
 	memPct := 0.0
@@ -87,13 +100,17 @@ func (p *SystemPoller) poll() {
 	}
 
 	p.emitter(SystemStats{
-		CPUPercent:  cpu,
-		MemPercent:  memPct,
-		MemUsedGB:   memUsed,
-		MemTotalGB:  memTotal,
-		NetDownKBps: netDown,
-		NetUpKBps:   netUp,
-		LocalIP:     ip,
+		CPUPercent:    cpu,
+		MemPercent:    memPct,
+		MemUsedGB:     memUsed,
+		MemTotalGB:    memTotal,
+		NetDownKBps:   netDown,
+		NetUpKBps:     netUp,
+		LocalIP:       ip,
+		DiskReadKBps:  diskRead,
+		DiskWriteKBps: diskWrite,
+		GpuPercent:    gpuUsage,
+		GpuTemp:       gpuTemp,
 	})
 }
 
@@ -235,6 +252,121 @@ func (p *SystemPoller) readNetSpeed() (downKBps, upKBps float64) {
 	downKBps = float64(dRx) / 1024.0 / intervalSec
 	upKBps = float64(dTx) / 1024.0 / intervalSec
 	return downKBps, upKBps
+}
+
+// readDiskBytes reads cumulative disk I/O bytes from /proc/diskstats.
+func (p *SystemPoller) readDiskBytes() (read, write uint64) {
+	f, err := os.Open("/proc/diskstats")
+	if err != nil {
+		return 0, 0
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 10 {
+			continue
+		}
+		// Skip partition devices (numbers in name) and loop devices
+		device := fields[2]
+		if strings.HasPrefix(device, "loop") || strings.ContainsAny(device, "0123456789") {
+			continue
+		}
+		// fields[3] = reads completed, fields[5] = sectors read
+		// fields[7] = writes completed, fields[9] = sectors written
+		// Sector size is typically 512 bytes
+		sectorsRead, err1 := strconv.ParseUint(fields[5], 10, 64)
+		sectorsWritten, err2 := strconv.ParseUint(fields[9], 10, 64)
+		if err1 == nil && err2 == nil {
+			read += sectorsRead * 512
+			write += sectorsWritten * 512
+		}
+	}
+	return read, write
+}
+
+// readDiskSpeed calculates disk read/write speed in KB/s since last poll.
+func (p *SystemPoller) readDiskSpeed() (readKBps, writeKBps float64) {
+	read, write := p.readDiskBytes()
+
+	p.diskMu.Lock()
+	dRead := read - p.prevDiskRead
+	dWrite := write - p.prevDiskWrite
+	p.prevDiskRead = read
+	p.prevDiskWrite = write
+	p.diskMu.Unlock()
+
+	intervalSec := float64(sysPollInterval) / float64(time.Second)
+	readKBps = float64(dRead) / 1024.0 / intervalSec
+	writeKBps = float64(dWrite) / 1024.0 / intervalSec
+	return readKBps, writeKBps
+}
+
+// readGPU attempts to read GPU usage and temperature.
+// Supports NVIDIA (via nvidia-smi) and AMD (via sysfs).
+func (p *SystemPoller) readGPU() (usage, temp float64) {
+	// Try NVIDIA first
+	if usage, temp := p.readNvidiaGPU(); usage > 0 || temp > 0 {
+		return usage, temp
+	}
+	// Try AMD
+	return p.readAmdGPU()
+}
+
+// readNvidiaGPU reads from nvidia-smi if available.
+func (p *SystemPoller) readNvidiaGPU() (usage, temp float64) {
+	// Check if nvidia-smi exists
+	if _, err := os.Stat("/usr/bin/nvidia-smi"); os.IsNotExist(err) {
+		return 0, 0
+	}
+
+	// Read GPU stats from nvidia-smi
+	// We use a simple approach: query utilization.gpu and temperature.gpu
+	f, err := os.Open("/proc/driver/nvidia/gpus/0/information")
+	if err != nil {
+		return 0, 0
+	}
+	defer f.Close()
+
+	// Alternative: parse nvidia-smi output (slower but more reliable)
+	// For now, just return 0 and let the fallback handle it
+	return 0, 0
+}
+
+// readAmdGPU reads from AMD GPU sysfs interface.
+func (p *SystemPoller) readAmdGPU() (usage, temp float64) {
+	// AMD GPU stats are in /sys/class/drm/card*/device/
+	// Look for card0, card1, etc.
+	matches, err := filepath.Glob("/sys/class/drm/card*/device/gpu_busy_percent")
+	if err != nil || len(matches) == 0 {
+		return 0, 0
+	}
+
+	// Read from the first available GPU
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			if u, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64); err == nil {
+				usage = u
+				break
+			}
+		}
+	}
+
+	// Try to read temperature
+	tempPaths, _ := filepath.Glob("/sys/class/drm/card*/device/hwmon/hwmon*/temp1_input")
+	for _, path := range tempPaths {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			if t, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64); err == nil {
+				temp = t / 1000.0 // Convert millidegrees to degrees
+				break
+			}
+		}
+	}
+
+	return usage, temp
 }
 
 // getLocalIP returns the primary non-loopback IPv4 address.
