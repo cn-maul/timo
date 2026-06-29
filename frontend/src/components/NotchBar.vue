@@ -52,6 +52,18 @@ const memText = computed(() => {
   return `${sys.memUsedGB.toFixed(1)}G`
 })
 
+const netDownText = computed(() => {
+  const v = sys.netDownKBps
+  if (v < 1024) return `${Math.round(v)}K`
+  return `${(v / 1024).toFixed(1)}M`
+})
+
+const netUpText = computed(() => {
+  const v = sys.netUpKBps
+  if (v < 1024) return `${Math.round(v)}K`
+  return `${(v / 1024).toFixed(1)}M`
+})
+
 // Shorten workDir for display
 const shortDir = computed(() => {
   if (!notif.workDir) return ''
@@ -59,15 +71,47 @@ const shortDir = computed(() => {
   return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : notif.workDir
 })
 
-// Encapsulate running-state primary text selection
-const primaryText = computed(() => {
-  if (notif.state !== 'running') return ''
-  return notif.topic || notif.tool || (notif.source === 'reasonix' ? 'Reasonix 运行中' : 'Claude 运行中')
+// AI mode display texts using new computed values from store
+const aiIcon = computed(() => {
+  if (notif.subagent && notif.agentType && settings.showSubagentDetails) return '🤖'
+  return notif.toolIcon
+})
+
+const aiPrimaryText = computed(() => {
+  if (!settings.showToolContext) {
+    // Fallback to simpler display
+    return notif.topic || notif.tool || (notif.source === 'reasonix' ? 'Reasonix 运行中' : 'Claude 运行中')
+  }
+  return notif.primaryText
+})
+
+const aiSecondaryText = computed(() => {
+  if (!settings.showToolContext) return ''
+  return notif.secondaryText
 })
 
 const showToolLine = computed(() =>
-  notif.state === 'running' && notif.topic && notif.tool
+  notif.state === 'running' && settings.showToolContext && notif.primaryText && notif.secondaryText
 )
+
+// Progress percentage based on tool count (estimate ~20 tools per task)
+const progressPercent = computed(() => {
+  if (notif.state !== 'running') return 0
+  if (!settings.showToolProgress) return 50 // Fixed progress when disabled
+  if (notif.toolCount === 0) return 5 // Show minimal progress when starting
+  return Math.min(95, 5 + (notif.toolCount * 4.5)) // Cap at 95% until done
+})
+
+// Subagent badge text
+const subagentBadgeText = computed(() => {
+  if (!notif.subagent) return ''
+  if (!settings.showSubagentDetails) return '⚡'
+  if (notif.agentType) return notif.agentTypeName
+  return '⚡'
+})
+
+// Show tool count indicator
+const showToolCount = computed(() => settings.showToolProgress && notif.state === 'running' && notif.toolCount > 0)
 
 const emit = defineEmits<{
   toggle: []
@@ -82,24 +126,34 @@ const emit = defineEmits<{
         <div class="notch-left">
           <img :src="notif.source === 'reasonix' ? '/reasonix.png' : '/claude.png'" class="claude-logo" :alt="notif.source === 'reasonix' ? 'Reasonix' : 'Claude'" />
           <div class="claude-info">
+            <!-- Primary text with icon -->
             <span class="claude-text" v-if="notif.state === 'running'">
-              {{ primaryText }}
-              <span v-if="notif.subagent" class="subagent-badge">⚡</span>
+              <span class="tool-icon">{{ aiIcon }}</span>
+              {{ aiPrimaryText }}
+              <span v-if="subagentBadgeText" class="subagent-badge">{{ subagentBadgeText }}</span>
             </span>
+            <!-- Secondary text (context/target) -->
             <span class="claude-text claude-tool" v-if="showToolLine">
-              {{ notif.tool }}
+              {{ aiSecondaryText }}
             </span>
+            <!-- Attention state -->
             <span class="claude-text" v-else-if="notif.state === 'attention'">
-              {{ notif.message || '需要关注' }}
+              ⚠️ {{ notif.message || '需要关注' }}
             </span>
+            <!-- Done state -->
+            <span class="claude-text" v-else-if="notif.state === 'done'">
+              ✓ {{ notif.finalMsg || notif.message || '完成' }}
+            </span>
+            <!-- Idle/fallback -->
             <span class="claude-text" v-else>
-              {{ notif.message || '完成' }}
+              {{ notif.message || '就绪' }}
             </span>
-            <span class="claude-dir" v-if="shortDir">{{ shortDir }}</span>
+            <span class="claude-dir" v-if="shortDir && notif.state === 'running'">{{ shortDir }}</span>
           </div>
         </div>
         <div class="notch-right">
           <span class="claude-timer" v-if="notif.state === 'running'">{{ notif.elapsedText }}</span>
+          <span class="tool-count" v-if="showToolCount">{{ notif.toolCount }}</span>
           <span
             class="traffic-light"
             :class="{
@@ -111,7 +165,7 @@ const emit = defineEmits<{
         </div>
       </div>
       <div class="notch-progress" v-if="notif.state === 'running'">
-        <div class="notch-progress-fill claude-progress" />
+        <div class="notch-progress-fill claude-progress" :style="{ width: progressPercent + '%' }" />
       </div>
     </template>
 
@@ -140,7 +194,7 @@ const emit = defineEmits<{
       </div>
     </template>
 
-    <!-- Idle mode: conditional CPU / Mem / Clock based on idleDisplay setting -->
+    <!-- Idle mode: conditional CPU / Mem / Net / Clock based on idleDisplay setting -->
     <template v-else-if="activeMode === 'idle'">
       <div class="notch-content">
         <div class="notch-left">
@@ -151,6 +205,12 @@ const emit = defineEmits<{
           <span class="sys-stat" v-if="settings.idleDisplay === 'all' || settings.idleDisplay === 'mem'">
             <span class="sys-label">MEM</span>
             <span class="sys-value">{{ memText }}</span>
+          </span>
+          <span class="sys-stat" v-if="settings.idleDisplay === 'all' || settings.idleDisplay === 'net'">
+            <span class="sys-label">↓</span>
+            <span class="sys-value">{{ netDownText }}</span>
+            <span class="sys-label">↑</span>
+            <span class="sys-value">{{ netUpText }}</span>
           </span>
         </div>
         <div class="notch-right">

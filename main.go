@@ -6,6 +6,7 @@ import (
 	"embed"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,43 +21,91 @@ var assets embed.FS
 var mainApp *application.App
 var mainWindow *application.WebviewWindow
 
-// openSettings resizes the main notch window to 1/3 screen and shows settings.
-// Uses the same window — no separate window to manage, no create/destroy bugs.
-func openSettings() {
-	screen, err := mainWindow.GetScreen()
-	mainWindow.DisableSizeConstraints()
+// settingsWindow is a separate window for the settings UI, kept alive across
+// open/close cycles (hidden rather than destroyed) so it can be reopened. It
+// lives on the main thread just like mainWindow.
+var settingsWindow *application.WebviewWindow
 
-	if err != nil || screen == nil {
-		mainWindow.SetURL("/?settings=1")
-		mainWindow.SetSize(400, 400)
-		mainWindow.SetPosition(0, 0)
+// screenCenter computes on-screen pixel coords to center a box of (w,h) on the
+// screen that the main notch window currently sits on. Falls back to the
+// window's own screen when available.
+func screenCenter(w, h int) (x, y int, ok bool) {
+	var sw, sh int
+	screen, err := mainWindow.GetScreen()
+	if err == nil && screen != nil {
+		sw, sh = screen.Size.Width, screen.Size.Height
+	}
+	if sw <= 0 || sh <= 0 {
+		return 0, 0, false
+	}
+	return (sw - w) / 2, (sh - h) / 2, true
+}
+
+// openSettings opens a dedicated, centered settings window. The notch window
+// is left untouched. The window is created once and then shown/hidden on
+// subsequent opens.
+func openSettings() {
+	if mainApp == nil {
 		return
 	}
 
-	sw := screen.Size.Width
-	sh := screen.Size.Height
-	w := sw / 3
-	h := sh / 3
-	x := (sw - w) / 2
-	y := (sh - h) / 2
+	// Reuse the existing window if it is still alive.
+	if settingsWindow != nil && !settingsWindowIsDead() {
+		settingsWindow.Show()
+		settingsWindow.UnMinimise()
+		settingsWindow.Focus()
+		return
+	}
 
-	// Save current notch state before switching
-	mainWindow.SetURL("/?settings=1")
-	mainWindow.SetSize(w, h)
-	mainWindow.SetPosition(x, y)
+	const (
+		w = 640
+		h = 500
+	)
+
+	opts := application.WebviewWindowOptions{
+		Title:            "Timo 设置",
+		Width:            w,
+		Height:           h,
+		MinWidth:         w,
+		MinHeight:        400,
+		Frameless:        true,
+		AlwaysOnTop:      false,
+		BackgroundType:   application.BackgroundTypeSolid,
+		BackgroundColour: application.NewRGBA(0, 0, 0, 0),
+		URL:              "/?settings=1",
+		Linux: application.LinuxWindow{
+			WindowIsTranslucent: false,
+		},
+	}
+	if x, y, ok := screenCenter(w, h); ok {
+		opts.InitialPosition = application.WindowXY
+		opts.X = x
+		opts.Y = y
+	} else {
+		opts.InitialPosition = application.WindowCentered
+	}
+
+	settingsWindow = mainApp.Window.NewWithOptions(opts)
+
+	// Intercept the window's close (the X button / WM delete) and just hide it,
+	// so the window can be reopened later without recreating it. Emitting
+	// close-settings also lets the frontend reset transient state.
+	settingsWindow.OnWindowEvent(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		if settingsWindow != nil {
+			settingsWindow.Hide()
+		}
+	})
 }
 
-// closeSettings restores the main window to notch mode.
-func closeSettings() {
-	mainWindow.SetURL("/")
-	mainWindow.SetSize(600, 64)
-	// Center at top
-	screen, err := mainWindow.GetScreen()
-	if err == nil && screen != nil {
-		sw := screen.Size.Width
-		x := (sw - 600) / 2
-		mainWindow.SetPosition(x, 0)
+// settingsWindowIsDead reports whether the cached settings window has been
+// torn down and must be recreated. Wails exposes no public IsDestroyed, so we
+// rely on whether it is still registered in the window manager (by ID).
+func settingsWindowIsDead() bool {
+	if settingsWindow == nil {
+		return true
 	}
+	w, ok := mainApp.Window.GetByID(settingsWindow.ID())
+	return !ok || w == nil
 }
 
 func init() {
@@ -81,8 +130,9 @@ func main() {
 	}
 
 	// Auto-inject Claude Code and Reasonix hooks on first run
-	AutoSetupHooks()
-	AutoSetupReasonixHooks()
+	// Commented out — users now control hook injection from Settings UI
+	// AutoSetupHooks()
+	// AutoSetupReasonixHooks()
 
 	// GUI mode: start the Wails app
 	mainApp = application.New(application.Options{
@@ -216,9 +266,82 @@ func main() {
 		}
 	})
 
-	// Close settings and restore notch mode
+	// Open settings from tray (after menu rebuild) and other sources
+	mainApp.Event.On("open-settings", func(event *application.CustomEvent) {
+		openSettings()
+	})
+
+	// Close settings window (frontend "✕" button) — hide, keep it openable again.
 	mainApp.Event.On("close-settings", func(event *application.CustomEvent) {
-		closeSettings()
+		if settingsWindow != nil {
+			settingsWindow.Hide()
+		}
+	})
+
+	// Hooks status query
+	mainApp.Event.On("get-hooks-status", func(event *application.CustomEvent) {
+		status := getHooksStatus()
+		mainApp.Event.Emit("hooks-status", status)
+	})
+
+	// Inject hooks
+	mainApp.Event.On("inject-hook", func(event *application.CustomEvent) {
+		tool, _ := event.Data.(string)
+		var msg string
+		switch tool {
+		case "claude":
+			if _, err := setupHooks(false); err != nil {
+				msg = "❌ Claude Code Hook 注入失败: " + err.Error()
+			} else {
+				msg = "✓ Claude Code Hook 已注入"
+			}
+		case "reasonix":
+			if _, err := setupReasonixHooks(false); err != nil {
+				msg = "❌ Reasonix Hook 注入失败: " + err.Error()
+			} else {
+				msg = "✓ Reasonix Hook 已注入"
+			}
+		case "all":
+			var errs []string
+			if _, err := setupHooks(false); err != nil {
+				errs = append(errs, "Claude: "+err.Error())
+			}
+			if _, err := setupReasonixHooks(false); err != nil {
+				errs = append(errs, "Reasonix: "+err.Error())
+			}
+			if len(errs) > 0 {
+				msg = "❌ 部分注入失败: " + strings.Join(errs, "; ")
+			} else {
+				msg = "✓ 全部 Hook 已注入"
+			}
+		}
+		mainApp.Event.Emit("hooks-feedback", msg)
+		// Refresh status
+		status := getHooksStatus()
+		mainApp.Event.Emit("hooks-status", status)
+	})
+
+	// Remove hooks
+	mainApp.Event.On("remove-hook", func(event *application.CustomEvent) {
+		tool, _ := event.Data.(string)
+		var msg string
+		switch tool {
+		case "claude":
+			if err := removeHooks(".claude"); err != nil {
+				msg = "❌ 移除失败: " + err.Error()
+			} else {
+				msg = "✓ Claude Code Hook 已移除"
+			}
+		case "reasonix":
+			if err := removeHooks(".reasonix"); err != nil {
+				msg = "❌ 移除失败: " + err.Error()
+			} else {
+				msg = "✓ Reasonix Hook 已移除"
+			}
+		}
+		mainApp.Event.Emit("hooks-feedback", msg)
+		status := getHooksStatus()
+		mainApp.Event.Emit("hooks-status", status)
 	})
 
 	// Defer cleanup so it runs even on panic

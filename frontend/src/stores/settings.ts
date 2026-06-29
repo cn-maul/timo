@@ -4,8 +4,11 @@ import { Events } from '@wailsio/runtime'
 
 export interface TimoSettings {
   displayPriority: string[]
-  idleDisplay: 'all' | 'cpu' | 'mem' | 'none'
+  idleDisplay: 'all' | 'cpu' | 'mem' | 'net' | 'none'
   theme: 'dark' | 'light'
+  showToolContext: boolean
+  showToolProgress: boolean
+  showSubagentDetails: boolean
 }
 
 function defaultSettings(): TimoSettings {
@@ -13,14 +16,22 @@ function defaultSettings(): TimoSettings {
     displayPriority: ['ai', 'media'],
     idleDisplay: 'all',
     theme: 'dark',
+    showToolContext: true,
+    showToolProgress: true,
+    showSubagentDetails: true,
   }
 }
 
 export const useSettingsStore = defineStore('settings', () => {
   const displayPriority = ref<string[]>(['ai', 'media'])
-  const idleDisplay = ref<'all' | 'cpu' | 'mem' | 'none'>('all')
+  const idleDisplay = ref<'all' | 'cpu' | 'mem' | 'net' | 'none'>('all')
   const theme = ref<'dark' | 'light'>('dark')
   const loaded = ref(false)
+
+  // New display options
+  const showToolContext = ref(true)
+  const showToolProgress = ref(true)
+  const showSubagentDetails = ref(true)
 
   // Request settings from Go backend
   function load() {
@@ -33,6 +44,9 @@ export const useSettingsStore = defineStore('settings', () => {
       displayPriority: displayPriority.value,
       idleDisplay: idleDisplay.value,
       theme: theme.value,
+      showToolContext: showToolContext.value,
+      showToolProgress: showToolProgress.value,
+      showSubagentDetails: showSubagentDetails.value,
     }
     Events.Emit('save-settings', s)
   }
@@ -48,6 +62,10 @@ export const useSettingsStore = defineStore('settings', () => {
     displayPriority.value = event.data.displayPriority || defaultSettings().displayPriority
     idleDisplay.value = (event.data.idleDisplay as any) || defaultSettings().idleDisplay
     theme.value = (event.data.theme as any) || defaultSettings().theme
+    // New fields with defaults
+    showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true
+    showToolProgress.value = event.data.showToolProgress !== undefined ? event.data.showToolProgress : true
+    showSubagentDetails.value = event.data.showSubagentDetails !== undefined ? event.data.showSubagentDetails : true
     loaded.value = true
     applyTheme(theme.value)
   })
@@ -58,6 +76,9 @@ export const useSettingsStore = defineStore('settings', () => {
     displayPriority.value = event.data.displayPriority || defaultSettings().displayPriority
     idleDisplay.value = (event.data.idleDisplay as any) || defaultSettings().idleDisplay
     theme.value = (event.data.theme as any) || defaultSettings().theme
+    showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true
+    showToolProgress.value = event.data.showToolProgress !== undefined ? event.data.showToolProgress : true
+    showSubagentDetails.value = event.data.showSubagentDetails !== undefined ? event.data.showSubagentDetails : true
     applyTheme(theme.value)
   })
 
@@ -71,6 +92,9 @@ export const useSettingsStore = defineStore('settings', () => {
     idleDisplay,
     theme,
     loaded,
+    showToolContext,
+    showToolProgress,
+    showSubagentDetails,
     load,
     save,
     applyTheme,

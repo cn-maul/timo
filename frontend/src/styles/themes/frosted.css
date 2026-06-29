@@ -27,4 +27,14 @@
   --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   --timo-overlay-bg: rgba(0, 0, 0, 0.3);
   --timo-backdrop-filter: blur(20px) saturate(1.4);
+
+  /* Frosted button & card backgrounds (light-tinted on glass) */
+  --timo-btn-bg: rgba(255, 255, 255, 0.1);
+  --timo-btn-hover: rgba(255, 255, 255, 0.18);
+  --timo-card-bg: rgba(255, 255, 255, 0.05);
+  --timo-card-hover: rgba(255, 255, 255, 0.08);
+  --timo-list-item-bg: rgba(255, 255, 255, 0.04);
+  --timo-list-item-hover: rgba(255, 255, 255, 0.08);
+  --timo-list-item-active: rgba(255, 255, 255, 0.12);
+  --timo-badge-bg: rgba(255, 255, 255, 0.12);
 }

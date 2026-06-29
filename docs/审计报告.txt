@@ -1,0 +1,255 @@
+● Timo 项目代码审计报告
+     
+  我通读了后端 Go（Wails v3 + MPRIS）、前端 Vue 3、构建脚本和配置，整理出以下
+  功能缺陷、实现薄弱点与潜在风险。按严重程度和影响范围分级，并给出修复建议。
+
+  ---
+  一、高危 / 核心功能缺陷
+  
+  1. 固定 Unix Socket 路径导致多实例冲突
+
+  位置：notify.go:17、main.go:115-122
+
+  const sockPath = "/tmp/timo.sock"
+
+  - 第二个 Timo 实例启动时会 os.Remove(sockPath) 并重新监听，第一个实例的 socket 被删掉，所有 AI hook
+  通知会发送到后启动的实例。
+  - 与 README 里宣称的“多实例 Claude 不再互相干扰”直接矛盾；Timo 自身多实例反而会互相干扰。
+  - 修复建议：按 PID/实例生成唯一 socket 路径（如
+  /tmp/timo-<pid>.sock），或在启动时检测已有实例并拒绝重复启动。
+
+  2. mainApp.Run() 出错时 defer cleanup 不会执行
+
+  位置：main.go:237-239
+
+  if err := mainApp.Run(); err != nil {
+      log.Fatal(err)
+  }
+
+  - log.Fatal 会立即 os.Exit，导致前面的 defer（停止 notify server、process monitor、system/media
+  poller、关闭 provider）都不会执行。
+  - 可能残留 /tmp/timo.sock、子 goroutine 和 D-Bus 连接。
+  - 修复建议：改为 log.Printf("timo: %v", err)，然后显式调用 cleanup 再 os.Exit(1)。
+
+  3. 进程监控匹配逻辑脆弱且可能误判
+
+  位置：notify.go:160-191
+
+  - 仅匹配 /proc/<pid>/comm 精确等于 "claude" 或 "reasonix"。Claude Code 实际二进制可能是
+  claude-code，Reasonix 也可能是 reasonix-agent 等；这样监控会失效。
+  - 排除自身的逻辑是 cmdline 里不能包含 "timo"，非常脆弱：如果用户把 Timo 放在 /home/timo/... 目录下，或 AI
+  工作目录带 timo 字样，会把真实 AI 进程误排除。
+  - 应该用 PID 自排除 + cmdline 前缀/包含匹配，而不是字符串 contains。
+  - 修复建议：记录当前进程 PID，遍历 /proc 时直接跳过自身；对 AI 进程做更宽松的名称匹配。
+
+  4. 媒体进度条在播放期间几乎不更新
+
+  位置：media/poller.go:94-105
+
+  diff := info.PositionMs - p.lastInfo.PositionMs
+  return diff < -1000 || diff > 2000
+
+  - 轮询间隔 1 秒，正常播放时 position 前进约 1000 ms，diff 通常不会大于 2000，所以不会触发 emit。
+  - 结果：用户看到的进度条只在切歌/seek 时跳变，播放中基本不动，与 README 描述的“进度条”功能不符。
+  - 修复建议：将阈值降到 500 ms 左右，或额外在 Playing 状态变化/每秒强制刷新一次 position。
+
+  5. 自动 Hook 注入未经用户确认且没有备份
+
+  位置：notify.go:311-348、installHooks
+
+  - 首次启动 GUI 会静默修改 ~/.claude/settings.json 和 ~/.reasonix/settings.json。
+  - 如果用户配置较复杂（带注释、特定缩进、非 JSON 扩展字段），会被 json.MarshalIndent
+  覆盖，可能丢失格式或内容。
+  - 没有回滚/备份机制，出错后用户配置可能被改坏。
+  - 修复建议：首次启动弹出确认；修改前备份原文件到 settings.json.timo.bak；合并时尽量保留原文件格式。
+
+  ---
+  二、中危 / 功能实现不佳
+  
+  6. 媒体播放器切换后仍显示旧播放器
+
+  位置：media/linux.go:36-56
+
+  if name == p.lastPlayer { return name }
+
+  - findPlayer 会优先返回上一次检测到的播放器。如果用户从 Spotify 切到 VLC，在 Spotify 退出前，Timo 一直显示
+  Spotify。
+  - 这与“显示当前活动媒体”的预期相悖。
+  - 修复建议：优先选择最近开始播放或发送过信号的播放器，而不是简单的 lastPlayer 记忆。
+
+  7. 只轮询媒体状态，未监听 D-Bus PropertiesChanged
+
+  位置：media/linux.go、media/poller.go
+
+  - 当前每秒轮询一次 D-Bus，延迟高、浪费 CPU/D-Bus 资源。
+  - MPRIS 有标准的 PropertiesChanged 信号，可以在播放/暂停/切歌时立即更新 UI。
+  - 修复建议：增加 D-Bus 信号订阅 + 轮询兜底，兼顾实时性与稳定性。
+
+  8. isTimoHook 识别规则过于宽松
+
+  位置：notify.go:323-326
+
+  return strings.Contains(cmd, "timo notify")
+
+  - 任何 command 字符串里包含 "timo notify" 就被当成 Timo hook，可能误删用户自己写的其他 hook。
+  - 修复建议：用更精确匹配，例如检测完整命令路径或 --type 参数模式。
+
+  9. 设置保存时持久化失败但 UI 已更新
+
+  位置：settingsservice.go:37-51
+
+  s.mu.Lock()
+  s.settings = settings
+  s.mu.Unlock()
+
+  if err := SaveSettings(settings); err != nil { ... }
+  mainApp.Event.Emit("settings-updated", &settings)
+
+  - 先更新了内存设置再保存磁盘，如果 SaveSettings 失败（权限、磁盘满），UI 和 tray
+  已经显示新设置，但重启后丢失。
+  - 也没有事务或回滚。
+  - 修复建议：先写磁盘成功再更新内存并广播事件；失败时返回错误给前端。
+
+  10. CPU 首次读数不准确
+
+  位置：sysinfo.go:46-48、readCPU
+
+  - Start() 里调用一次 p.readCPU() 来“预热”，但这次调用会返回 0 并初始化 prevIdle/prevTotal=0。
+  - 随后第一次 poll() 的差值基于 0 基准，可能算出一个畸高的 CPU 占用率。
+  - 修复建议：把预热结果丢弃，或让 readCPU 返回是否可用于计算；首次 emit 跳过 CPU 值。
+
+  11. Tray 菜单重建后与初始菜单行为不一致
+
+  位置：tray.go:35-62、tray.go:66-130
+
+  - setupSystemTray 中“显示/隐藏”会调用 mainWindow.Focus()；UpdateTrayStatus 重建的菜单里却没有。
+  - setupSystemTray 中“设置”直接调用传入的 openSettings()；UpdateTrayStatus 里改成 emit open-settings。
+  - 行为分叉，后期维护容易遗漏。
+  - 修复建议：抽出一个 buildTrayMenu() 统一构建函数，两个地方都复用。
+
+  12. 设置面板缺少磨砂主题选项且主题类型不统一
+
+  位置：frontend/src/stores/settings.ts:9、frontend/src/components/SettingsPanel.vue:147-169
+
+  - 后端 TimoSettings.Theme 注释只支持 dark|light，tray 菜单里却有 frosted。
+  - 前端 TichoSettings.theme TS 类型只有 'dark' | 'light'，实际 frosted 主题文件存在但设置面板没有选项。
+  - main.ts 也没有导入 frosted.css，frosted 主题可能无法生效。
+  - 修复建议：统一前后端枚举为 dark|light|frosted；设置面板加上 frosted 卡片；main.ts 导入 frosted.css
+  或按需动态加载。
+
+  13. 设置面板优先级只能升不能降
+
+  位置：frontend/src/components/SettingsPanel.vue:45-54
+
+  - togglePriority 只实现了“上移一位”，用户无法把已经移上去的项再降下来，除非点“恢复默认”。
+  - 与“可配置优先级”的完整预期不符。
+  - 修复建议：增加下移按钮或拖拽排序。
+
+  ---
+  三、低危 / 代码质量与可维护性问题
+  
+  14. GTK4 已弃用 API 的兼容性债务
+
+  位置：linux_window.go:28-29
+
+  gdk_x11_display_get_xdisplay
+  gdk_x11_surface_get_xid
+
+  - 编译已出现 deprecation warning，未来 GTK4 版本可能移除这两个函数。
+  - 届时 X11 dock/置顶/任务栏隐藏功能会编译失败。
+  - 修复建议：研究 GTK4 官方推荐的窗口类型设置方式，或准备条件编译 fallback。
+
+  15. Wayland 上 Dock/置顶功能实际失效
+
+  位置：linux_window.go:92-99
+
+  - configureDockWindow 在 Wayland 上直接 return，README 却标“Wayland 基础支持”。
+  - 结果 Wayland 下窗口会出现在任务栏、Alt-Tab 中，也无法保证始终置顶。
+  - 修复建议：文档明确说明限制；或探索 zwlr_layer_shell_v1 等 Wayland 协议实现 dock。
+
+  16. 跨平台支持非常薄弱
+
+  位置：media/provider_windows.go、sysinfo.go（linux build tag）、linux_window_other.go
+
+  - Windows 的 media provider 直接返回 error，但 README 又说“Windows 基础支持”。
+  - sysinfo.go、linux_window.go、notify.go 都带 //go:build linux，Windows/macOS 编译时这些功能为空或 stub。
+  - 当前代码更像“Linux-only”，与 README 的多平台声明差距较大。
+  - 修复建议：统一平台抽象接口；为 Windows/macOS 补齐至少能编译的 stub 和功能实现计划。
+
+  17. 全局变量 mainApp/mainWindow 耦合严重
+
+  位置：main.go:20-21、tray.go、settingsservice.go
+
+  - 多处直接读写全局变量，单测困难，也容易出现 nil 指针。
+  - 例如 UpdateTrayStatus 重建菜单里的 lambda 捕获全局变量；SettingsService.Update 直接引用 mainApp。
+  - 修复建议：把依赖通过构造函数/接口注入，避免包级全局变量。
+
+  18. CLI 参数解析缺失且 stdin 限制 4KB
+
+  位置：notify.go:204-284
+
+  - RunCLI 只解析 --type/--msg/--tool/--dir，README 示例里的 --topic 根本没解析。
+  - io.LimitReader(os.Stdin, 4096) 可能截断较大的 hook payload。
+  - 修复建议：使用 flag 包统一解析；增大或取消 stdin 限制，或至少记录截断警告。
+
+  19. 媒体临时错误导致 UI 闪烁
+
+  位置：media/poller.go:78-86
+
+  - GetState 一旦出错就 emit 空 MediaInfo，清空 UI；下一秒恢复正常又显示回来。
+  - 偶发的 D-Bus 调用失败会让胶囊栏闪烁。
+  - 修复建议：出错时保持 lastInfo 不变，连续失败 N 次后再清空。
+
+  20. 构建配置仍是 Wails 模板占位符
+
+  位置：build/config.yml:8-14
+
+  companyName: "My Company"
+  productName: "My Product"
+  productIdentifier: "com.mycompany.myproduct"
+
+  - 这些元数据会进入打包后的 .desktop、MSIX、Info.plist 等，直接影响应用标识。
+  - 修复建议：替换为真实的公司/产品/Bundle ID。
+
+  ---
+  四、安全与稳定性风险
+  
+  ┌───────────────────────────┬──────────────────┬───────────────────────────────────────────────────────┐
+  │           问题            │       位置       │                         说明                          │
+  ├───────────────────────────┼──────────────────┼───────────────────────────────────────────────────────┤
+  │ Socket 0600               │ notify.go:57     │ 任何能访问 socket 的同一用户进程都可伪造 AI 状态      │
+  │ 权限虽好但无身份验证      │                  │                                                       │
+  ├───────────────────────────┼──────────────────┼───────────────────────────────────────────────────────┤
+  │ 自动注入 hooks            │ notify.go        │ 静默改写 ~/.claude/settings.json                      │
+  │ 修改用户配置              │                  │                                                       │
+  ├───────────────────────────┼──────────────────┼───────────────────────────────────────────────────────┤
+  │ mainApp.Run()             │ main.go:237      │ 见缺陷 #2                                             │
+  │ 错误路径资源泄漏          │                  │                                                       │
+  ├───────────────────────────┼──────────────────┼───────────────────────────────────────────────────────┤
+  │ 前端 coverUrl             │ DropPanel.vue:21 │ 若播放器返回 file:// 或远程                           │
+  │ 直接使用外部 URL          │                  │ URL，可能触发非预期网络请求或本地文件读取             │
+  └───────────────────────────┴──────────────────┴───────────────────────────────────────────────────────┘
+
+  ---
+  五、建议修复优先级
+  
+  P0（尽快修复）
+
+  1. 固定 socket 路径导致多实例冲突
+  2. log.Fatal 跳过 defer cleanup
+  3. 媒体进度条播放中不更新
+
+  P1（近期修复）
+
+  4. 进程监控 PID 自排除 + 宽松名称匹配
+  5. Hook 自动注入增加确认与备份
+  6. 媒体播放器切换逻辑 + D-Bus 信号订阅
+  7. 设置保存先写磁盘再更新内存
+  8. 设置面板补齐 frosted 主题
+
+  P2（迭代优化）
+
+  9. GTK4 弃用 API 与 Wayland 支持
+  10. Windows/macOS 平台补齐
+  11. 全局变量解耦
+  12. 构建配置替换占位符

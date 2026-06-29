@@ -14,16 +14,26 @@ if [[ "$1" == "--clean" ]]; then
 fi
 
 # ── Detect nvm and use a compatible Node version ──
-if [ -f "$HOME/.nvm/nvm.sh" ]; then
+# Locate nvm.sh robustly: honor $NVM_DIR if set, otherwise probe the two
+# common install locations (~/.config/nvm and ~/.nvm). We can't rely on the
+# $NVM_DIR env var alone because it's only exported from .bashrc, which
+# non-interactive shells (e.g. double-clicking build.sh) never source.
+NVM_SH=""
+for _cand in "$NVM_DIR/nvm.sh" "$HOME/.config/nvm/nvm.sh" "$HOME/.nvm/nvm.sh"; do
+    [ -s "$_cand" ] && { NVM_SH="$_cand"; break; }
+done
+if [ -n "$NVM_SH" ]; then
     # shellcheck source=/dev/null
-    . "$HOME/.nvm/nvm.sh"
+    . "$NVM_SH"
     # Check if current node meets Vite's requirement (>=20.19 or >=22.12)
     NODE_VER=$(node --version 2>/dev/null | sed 's/v//' | cut -d. -f1)
-    if [ "$NODE_VER" -lt 22 ] 2>/dev/null; then
-        info "Node $NODE_VER detected, looking for v22+ via nvm..."
-        # Try to use the latest installed 22.x
+    if [ -z "$NODE_VER" ] || [ "$NODE_VER" -lt 22 ] 2>/dev/null; then
+        info "Node ${NODE_VER:-none} active, switching to v22+ via nvm..."
+        # Prefer an installed 22.x; fall back to the default alias.
         if nvm ls 22 >/dev/null 2>&1; then
             nvm use 22 >/dev/null 2>&1 && info "Switched to $(node --version) via nvm" || true
+        elif nvm use default >/dev/null 2>&1; then
+            info "Switched to $(node --version) (nvm default)" || true
         fi
     fi
 fi

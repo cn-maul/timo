@@ -63,5 +63,16 @@ func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 		s.Theme = theme
 	}
 
+	// New boolean display options
+	if v, ok := m["showToolContext"].(bool); ok {
+		s.ShowToolContext = v
+	}
+	if v, ok := m["showToolProgress"].(bool); ok {
+		s.ShowToolProgress = v
+	}
+	if v, ok := m["showSubagentDetails"].(bool); ok {
+		s.ShowSubagentDetails = v
+	}
+
 	return &s
 }

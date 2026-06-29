@@ -31,6 +31,18 @@ type Notification struct {
 	Tool    string `json:"tool"`    // Current tool name (from PreToolUse)
 	WorkDir string `json:"workDir"` // Working directory
 	Topic   string `json:"topic"`   // User's prompt text (from UserPromptSubmit)
+
+	// Extended fields for richer display
+	ToolInput   map[string]interface{} `json:"toolInput,omitempty"`   // Full tool parameters (from PreToolUse)
+	ToolOutput  map[string]interface{} `json:"toolOutput,omitempty"`  // Tool result (from PostToolUse)
+	DurationMs  int                    `json:"durationMs,omitempty"`  // Execution time in milliseconds
+	AgentType   string                 `json:"agentType,omitempty"`   // Subagent type (Explore, Plan, etc.)
+	AgentDesc   string                 `json:"agentDesc,omitempty"`   // Subagent task description
+	AgentResult string                 `json:"agentResult,omitempty"` // Subagent result summary (last_assistant_message)
+	FinalMsg    string                 `json:"finalMsg,omitempty"`    // Stop event summary message
+	ToolCount   int                    `json:"toolCount,omitempty"`   // Tool call count for progress
+	EffortLevel string                 `json:"effortLevel,omitempty"` // Effort level (low/medium/high/xhigh/max)
+	IsPreTool   bool                   `json:"isPreTool,omitempty"`   // Is this a PreToolUse event (before execution)
 }
 
 // NotifyServer listens on a Unix domain socket for notifications.
@@ -245,7 +257,7 @@ func RunCLI() {
 		return
 	}
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		data, err := io.ReadAll(io.LimitReader(os.Stdin, 4096))
+		data, err := io.ReadAll(io.LimitReader(os.Stdin, 262144)) // 256KB limit per spec
 		if err == nil && len(data) > 0 {
 			var hookData map[string]interface{}
 			if json.Unmarshal(data, &hookData) == nil {
@@ -272,6 +284,82 @@ func RunCLI() {
 				// Working directory from Reasonix payload (has "cwd" field)
 				if cwd, ok := hookData["cwd"].(string); ok && cwd != "" && notif.WorkDir == "" {
 					notif.WorkDir = cwd
+				}
+
+				// === Extended fields ===
+
+				// Tool input (full parameters)
+				// Reasonix spec uses "toolArgs" (camelCase); Claude uses "tool_input"/"toolInput"
+				if toolArgs, ok := hookData["toolArgs"].(map[string]interface{}); ok {
+					notif.ToolInput = toolArgs
+				} else if toolInput, ok := hookData["tool_input"].(map[string]interface{}); ok {
+					notif.ToolInput = toolInput
+				} else if toolInput, ok := hookData["toolInput"].(map[string]interface{}); ok {
+					notif.ToolInput = toolInput
+				}
+
+				// Tool output/result (from PostToolUse)
+				// Reasonix spec uses "toolResult" (string); Claude uses "tool_response" (map)
+				if toolResult, ok := hookData["toolResult"].(string); ok && toolResult != "" {
+					// Wrap string result in a map for consistent frontend handling
+					notif.ToolOutput = map[string]interface{}{"output": toolResult}
+				} else if toolOutput, ok := hookData["tool_response"].(map[string]interface{}); ok {
+					notif.ToolOutput = toolOutput
+				}
+
+				// Duration in milliseconds
+				if duration, ok := hookData["duration_ms"].(float64); ok {
+					notif.DurationMs = int(duration)
+				}
+
+				// Agent type (from SubagentStart/SubagentStop)
+				if agentType, ok := hookData["agent_type"].(string); ok {
+					notif.AgentType = agentType
+				}
+
+				// Agent description (from Agent tool input)
+				if notif.ToolInput != nil {
+					if desc, ok := notif.ToolInput["description"].(string); ok {
+						notif.AgentDesc = desc
+					} else if prompt, ok := notif.ToolInput["prompt"].(string); ok && len(prompt) > 0 {
+						// Use prompt as description if no description field
+						if len(prompt) > 100 {
+							notif.AgentDesc = prompt[:100] + "..."
+						} else {
+							notif.AgentDesc = prompt
+						}
+					}
+				}
+
+				// Agent result / last assistant message (from SubagentStop/Stop)
+				// Reasonix spec uses "lastAssistantText"; Claude uses "last_assistant_message"
+				var lastAssistantText string
+				if lat, ok := hookData["lastAssistantText"].(string); ok {
+					lastAssistantText = lat
+				} else if lastMsg, ok := hookData["last_assistant_message"].(string); ok {
+					lastAssistantText = lastMsg
+				}
+				if lastAssistantText != "" {
+					if len(lastAssistantText) > 200 {
+						notif.AgentResult = lastAssistantText[:200] + "..."
+					} else {
+						notif.AgentResult = lastAssistantText
+					}
+					// Also use for Stop event's FinalMsg
+					if strings.HasPrefix(notif.Type, "reasonix-stop") || strings.HasPrefix(notif.Type, "claude-stop") {
+						if len(lastAssistantText) > 200 {
+							notif.FinalMsg = lastAssistantText[:200] + "..."
+						} else {
+							notif.FinalMsg = lastAssistantText
+						}
+					}
+				}
+
+				// Effort level
+				if effort, ok := hookData["effort"].(map[string]interface{}); ok {
+					if level, ok := effort["level"].(string); ok {
+						notif.EffortLevel = level
+					}
 				}
 			}
 		}
@@ -359,7 +447,7 @@ func RunSetupReasonix() {
 	settingsPath := filepath.Join(home, ".reasonix", "settings.json")
 	fmt.Printf("✓ Reasonix hooks configured in %s\n", settingsPath)
 	fmt.Printf("  Timo path: %s\n", timoPath)
-	fmt.Printf("  Hooks: UserPromptSubmit, Stop\n")
+	fmt.Printf("  Hooks: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostLLMCall, SubagentStop, Stop, Notification, PreCompact\n")
 }
 
 // buildHooksConfig builds the timo hooks entries for the given type prefix.
@@ -367,18 +455,67 @@ func RunSetupReasonix() {
 // Reasonix uses flat format: {command}; Claude uses nested format: {matcher, hooks: [{type, command}]}.
 func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{} {
 	if typePrefix == "reasonix" {
-		// Reasonix flat format per DESKTOP_HOOKS spec
-		// No Stop hook — ProcessMonitor detects process exit (handles multiple instances)
+		// Reasonix flat format per docs/reasonix.md spec
+		// 9 events (no SessionEnd - ProcessMonitor handles process exit)
 		return map[string]interface{}{
+			"SessionStart": []interface{}{
+				map[string]interface{}{
+					"command":     timoPath + ` notify --type reasonix-session-start`,
+					"description": "Timo: session started",
+				},
+			},
 			"UserPromptSubmit": []interface{}{
 				map[string]interface{}{
-					"command": timoPath + ` notify --type reasonix-prompt --dir "$(pwd)"`,
+					"command":     timoPath + ` notify --type reasonix-prompt --dir "$(pwd)"`,
+					"description": "Timo: prompt submitted",
+				},
+			},
+			"PreToolUse": []interface{}{
+				map[string]interface{}{
+					"match":       "*",
+					"command":     timoPath + ` notify --type reasonix-pre-tool`,
+					"description": "Timo: tool starting",
+					"timeout":     5000,
 				},
 			},
 			"PostToolUse": []interface{}{
 				map[string]interface{}{
-					"match":   "*",
-					"command": timoPath + ` notify --type reasonix-tool`,
+					"match":       "*",
+					"command":     timoPath + ` notify --type reasonix-tool`,
+					"description": "Timo: tool finished",
+					"timeout":     30000,
+				},
+			},
+			"PostLLMCall": []interface{}{
+				map[string]interface{}{
+					"command":     timoPath + ` notify --type reasonix-llm`,
+					"description": "Timo: LLM response",
+					"timeout":     30000,
+				},
+			},
+			"SubagentStop": []interface{}{
+				map[string]interface{}{
+					"command":     timoPath + ` notify --type reasonix-subagent-stop`,
+					"description": "Timo: subagent done",
+				},
+			},
+			"Stop": []interface{}{
+				map[string]interface{}{
+					"command":     timoPath + ` notify --type reasonix-stop`,
+					"description": "Timo: turn finished",
+				},
+			},
+			"Notification": []interface{}{
+				map[string]interface{}{
+					"command":     timoPath + ` notify --type reasonix-notify`,
+					"description": "Timo: attention needed",
+				},
+			},
+			"PreCompact": []interface{}{
+				map[string]interface{}{
+					"command":     timoPath + ` notify --type reasonix-precompact`,
+					"description": "Timo: compacting",
+					"timeout":     30000,
 				},
 			},
 		}
@@ -393,6 +530,17 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 					map[string]interface{}{
 						"type":    "command",
 						"command": timoPath + ` notify --type claude-prompt --dir "$(pwd)"`,
+					},
+				},
+			},
+		},
+		"PreToolUse": []interface{}{
+			map[string]interface{}{
+				"matcher": "*",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-pre-tool`,
 					},
 				},
 			},
@@ -425,7 +573,18 @@ func buildHooksConfig(timoPath string, typePrefix string) map[string]interface{}
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": timoPath + ` notify --type claude-subagent-done`,
+						"command": timoPath + ` notify --type claude-subagent-stop`,
+					},
+				},
+			},
+		},
+		"Stop": []interface{}{
+			map[string]interface{}{
+				"matcher": "",
+				"hooks": []interface{}{
+					map[string]interface{}{
+						"type":    "command",
+						"command": timoPath + ` notify --type claude-stop`,
 					},
 				},
 			},
@@ -565,4 +724,139 @@ func installHooks(isAuto bool, configDir string, typePrefix string, successMsg s
 	}
 
 	return timoPath, nil
+}
+
+// HooksStatus represents the installation status of hooks for each tool.
+type HooksStatus struct {
+	Claude   HookInfo `json:"claude"`
+	Reasonix HookInfo `json:"reasonix"`
+}
+
+type HookInfo struct {
+	Installed bool   `json:"installed"`
+	Path      string `json:"path"`
+}
+
+// getHooksStatus checks whether hooks are installed for Claude Code and Reasonix.
+func getHooksStatus() HooksStatus {
+	return HooksStatus{
+		Claude:   checkHookInstalled(".claude"),
+		Reasonix: checkHookInstalled(".reasonix"),
+	}
+}
+
+// checkHookInstalled reads the settings file and checks for timo hooks.
+func checkHookInstalled(configDir string) HookInfo {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return HookInfo{}
+	}
+	settingsPath := filepath.Join(home, configDir, "settings.json")
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return HookInfo{Path: settingsPath}
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return HookInfo{Path: settingsPath}
+	}
+
+	installed := false
+	if hooksRaw, ok := settings["hooks"]; ok {
+		hooksJSON, _ := json.Marshal(hooksRaw)
+		if strings.Contains(string(hooksJSON), "timo notify") {
+			installed = true
+		}
+	}
+
+	return HookInfo{
+		Installed: installed,
+		Path:      settingsPath,
+	}
+}
+
+// removeHooks removes all timo-related hooks from the specified config directory.
+func removeHooks(configDir string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	settingsPath := filepath.Join(home, configDir, "settings.json")
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // No settings file, nothing to remove
+		}
+		return fmt.Errorf("cannot read %s: %w", settingsPath, err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return fmt.Errorf("cannot parse %s: %w", settingsPath, err)
+	}
+
+	if settings == nil {
+		return nil
+	}
+
+	hooks, ok := settings["hooks"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	for event, entriesRaw := range hooks {
+		entries, ok := entriesRaw.([]interface{})
+		if !ok {
+			continue
+		}
+		var kept []interface{}
+		for _, entry := range entries {
+			m, ok := entry.(map[string]interface{})
+			if !ok {
+				kept = append(kept, entry)
+				continue
+			}
+			if isTimoHookNested(m) {
+				continue
+			}
+			kept = append(kept, entry)
+		}
+		if len(kept) > 0 {
+			hooks[event] = kept
+		} else {
+			delete(hooks, event)
+		}
+	}
+
+	if len(hooks) == 0 {
+		delete(settings, "hooks")
+	} else {
+		settings["hooks"] = hooks
+	}
+
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("cannot encode settings: %w", err)
+	}
+	return os.WriteFile(settingsPath, append(out, '\n'), 0644)
+}
+
+// isTimoHookNested checks if a hook entry contains timo notify.
+func isTimoHookNested(m map[string]interface{}) bool {
+	if cmd, ok := m["command"].(string); ok && strings.Contains(cmd, "timo notify") {
+		return true
+	}
+	if hooksArr, ok := m["hooks"].([]interface{}); ok {
+		for _, h := range hooksArr {
+			if hookMap, ok := h.(map[string]interface{}); ok {
+				if cmd, ok := hookMap["command"].(string); ok && strings.Contains(cmd, "timo notify") {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
