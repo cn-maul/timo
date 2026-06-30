@@ -9,6 +9,7 @@ export interface TimoSettings {
   showToolContext: boolean
   showToolProgress: boolean
   showSubagentDetails: boolean
+  netUnit?: string
 }
 
 function defaultSettings(): TimoSettings {
@@ -19,6 +20,7 @@ function defaultSettings(): TimoSettings {
     showToolContext: true,
     showToolProgress: true,
     showSubagentDetails: true,
+    netUnit: 'auto',
   }
 }
 
@@ -32,6 +34,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const showToolContext = ref(true)
   const showToolProgress = ref(true)
   const showSubagentDetails = ref(true)
+
+  // Network unit
+  const netUnit = ref<'auto' | 'kb' | 'mb'>('auto')
 
   // Request settings from Go backend
   function load() {
@@ -47,6 +52,7 @@ export const useSettingsStore = defineStore('settings', () => {
       showToolContext: showToolContext.value,
       showToolProgress: showToolProgress.value,
       showSubagentDetails: showSubagentDetails.value,
+      netUnit: netUnit.value,
     }
     Events.Emit('save-settings', s)
   }
@@ -66,6 +72,7 @@ export const useSettingsStore = defineStore('settings', () => {
     showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true
     showToolProgress.value = event.data.showToolProgress !== undefined ? event.data.showToolProgress : true
     showSubagentDetails.value = event.data.showSubagentDetails !== undefined ? event.data.showSubagentDetails : true
+    netUnit.value = (event.data.netUnit as any) || defaultSettings().netUnit
     loaded.value = true
     applyTheme(theme.value)
   })
@@ -79,6 +86,7 @@ export const useSettingsStore = defineStore('settings', () => {
     showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true
     showToolProgress.value = event.data.showToolProgress !== undefined ? event.data.showToolProgress : true
     showSubagentDetails.value = event.data.showSubagentDetails !== undefined ? event.data.showSubagentDetails : true
+    netUnit.value = (event.data.netUnit as any) || defaultSettings().netUnit
     applyTheme(theme.value)
   })
 
@@ -95,6 +103,7 @@ export const useSettingsStore = defineStore('settings', () => {
     showToolContext,
     showToolProgress,
     showSubagentDetails,
+    netUnit,
     load,
     save,
     applyTheme,

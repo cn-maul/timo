@@ -22,6 +22,9 @@ type LinuxProvider struct {
 	conn         *dbus.Conn
 	lastPlayer   string
 
+	// Cached current track ID for SeekTo (MPRIS requires the actual track ID)
+	currentTrackID dbus.ObjectPath
+
 	// Signal subscription
 	signalChan chan struct{}
 	signalStop chan struct{}
@@ -84,6 +87,12 @@ func (p *LinuxProvider) GetState() (*MediaInfo, error) {
 	metadata, ok := metaVar.Value().(map[string]dbus.Variant)
 	if !ok {
 		return nil, fmt.Errorf("unexpected metadata type")
+	}
+
+	if v, ok := metadata["mpris:trackid"]; ok {
+		if trackID, ok := v.Value().(dbus.ObjectPath); ok && trackID != "" {
+			p.currentTrackID = trackID
+		}
 	}
 
 	if v, ok := metadata["xesam:title"]; ok {
@@ -155,6 +164,8 @@ func (p *LinuxProvider) Next() error     { return p.callPlayerMethod("Next") }
 func (p *LinuxProvider) Previous() error { return p.callPlayerMethod("Previous") }
 
 // SeekTo jumps to the specified position in milliseconds.
+// Uses the cached track ID from the last GetState() call,
+// as required by the MPRIS specification.
 func (p *LinuxProvider) SeekTo(positionMs int64) error {
 	obj, err := p.getPlayerObject()
 	if err != nil {
@@ -162,7 +173,14 @@ func (p *LinuxProvider) SeekTo(positionMs int64) error {
 	}
 	// MPRIS uses microseconds for position
 	positionUs := positionMs * 1000
-	return obj.Call(mprisPlayerIface+".SetPosition", 0, dbus.ObjectPath("/org/mpris/MediaPlayer2"), positionUs).Err
+
+	// Use the cached track ID; fall back to the MPRIS object path if unknown.
+	trackID := p.currentTrackID
+	if trackID == "" {
+		trackID = dbus.ObjectPath(mprisObject)
+	}
+
+	return obj.Call(mprisPlayerIface+".SetPosition", 0, trackID, positionUs).Err
 }
 
 // SetShuffle enables or disables shuffle mode.

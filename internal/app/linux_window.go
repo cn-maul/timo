@@ -4,6 +4,8 @@ package app
 
 /*
 #cgo pkg-config: gtk4 x11
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <gtk/gtk.h>
 #include <gdk/x11/gdkx.h>
 #include <X11/Xlib.h>
@@ -71,6 +73,7 @@ static void configure_window_x11(GtkWindow *win) {
                SubstructureRedirectMask | SubstructureNotifyMask, &ev);
     XFlush(xdisplay);
 }
+#pragma GCC diagnostic pop
 */
 import "C"
 

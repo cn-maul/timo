@@ -89,7 +89,7 @@ Timo 按优先级在三种场景间自动切换，**同时只显示一个场景*
 | 后端 | Go 1.25 · Wails v3 · godbus/dbus (MPRIS) |
 | 前端 | Vue 3 (Composition API) · Pinia · Vite · TypeScript |
 | 构建 | Taskfile · Wails CLI · nfpm (deb/rpm) · NSIS (Windows) · Docker |
-| 平台 | Linux（完整支持）· Windows（基础支持，媒体功能开发中）|
+| 平台 | Linux（完整支持）· Windows（基础支持）|
 
 ---
 
@@ -144,7 +144,7 @@ task run:docker           # 构建并运行 Docker 容器（端口 8080）
 task build:server         # 构建 HTTP 服务器模式
 task run:server           # 运行 HTTP 服务器
 task generate:bindings    # 重新生成前端 TypeScript 类型绑定
-task generate:icons       # 生成应用图标（.ico / .icns）
+task generate:icons       # 生成应用图标（.ico）
 ```
 
 ---
@@ -266,9 +266,6 @@ timo/
 │   ├── Taskfile.yml        # 通用构建任务
 │   ├── linux/              # Linux：nfpm 配置、AppImage 脚本、.desktop 文件
 │   ├── windows/            # Windows：NSIS 脚本、MSIX 清单
-│   ├── darwin/             # macOS：Assets.car、Info.plist
-│   ├── ios/                # iOS：Xcode 项目、LaunchScreen
-│   ├── android/            # Android：Gradle、Java 源码
 │   └── docker/             # Dockerfile（跨编译 + 服务器模式）
 │
 ├── docs/                   # 📖 开发文档
@@ -313,9 +310,10 @@ Timo 采用 **Go 后端 + Vue 前端** 的 Wails 应用架构：
 |------|:----:|------|
 | Linux (X11) | ✅ 完整支持 | MPRIS 媒体控制、系统监控、Dock 窗口均已就绪 |
 | Linux (Wayland) | ⚠️ 基础支持 | 功能可用，但 Dock 窗口模式仅在 X11 下生效 |
-| Windows | 🔨 基础支持 | 框架就绪，媒体功能待实现 |
-| macOS | 📋 已规划 | 构建资源已存在 |
-| iOS / Android | 📋 已规划 | Wails Mobile 脚手架已存在 |
+| Windows | ✅ 支持 | 框架就绪（媒体功能需 MPRIS 兼容播放器支持）|
+| macOS | ❌ 不支持 | Timo 不支持 macOS，请使用 Linux 或 Windows |
+
+> **关于 macOS**：Timo 基于 Wails v3 构建，但 macOS 平台尚未实现全局热键、系统监控和 Dock 窗口等核心功能。如果希望支持 macOS，欢迎提交 PR。注意 `build/darwin/` 和 `build/ios/` 目录已移除。
 
 ---
 

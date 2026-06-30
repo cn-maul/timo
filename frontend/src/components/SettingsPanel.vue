@@ -52,6 +52,7 @@ onMounted(() => {
     localShowToolContext.value = settings.showToolContext
     localShowToolProgress.value = settings.showToolProgress
     localShowSubagentDetails.value = settings.showSubagentDetails
+    localNetUnit.value = settings.netUnit as any || 'auto'
   }
   Events.Emit('get-hooks-status')
 })
@@ -64,6 +65,7 @@ const unsubLoaded = settings.$subscribe(() => {
     localShowToolContext.value = settings.showToolContext
     localShowToolProgress.value = settings.showToolProgress
     localShowSubagentDetails.value = settings.showSubagentDetails
+    localNetUnit.value = settings.netUnit as any || 'auto'
   }
 })
 
@@ -101,6 +103,7 @@ function saveSettings() {
   settings.showToolContext = localShowToolContext.value
   settings.showToolProgress = localShowToolProgress.value
   settings.showSubagentDetails = localShowSubagentDetails.value
+  settings.netUnit = localNetUnit.value
   settings.save()
   showSavedFeedback()
 }

@@ -33,9 +33,6 @@ func Run(assets embed.FS) {
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
-		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
-		},
 	})
 
 	// Media provider
@@ -132,8 +129,15 @@ func Run(assets embed.FS) {
 			sw := screen.Size.Width
 			notchW := sw / 3
 			windowW := notchW + 16
+			// Guard against negative position on very small screens
+			if windowW > sw {
+				windowW = sw
+			}
 			win.SetSize(windowW, 64)
 			x := (sw - windowW) / 2
+			if x < 0 {
+				x = 0
+			}
 			win.SetPosition(x, 0)
 		}
 		// Configure as dock window: skip taskbar, always on top
@@ -194,9 +198,9 @@ func Run(assets embed.FS) {
 		// Toggle media hotkey
 		if initialSettings.Hotkeys.Enabled && initialSettings.Hotkeys.ToggleMedia != "" && mediaSvc != nil {
 			hotkeyManager.Register(initialSettings.Hotkeys.ToggleMedia, func() {
-				// Simple toggle: try play, if fails try pause
-				if err := mediaSvc.Play(); err != nil {
-					mediaSvc.Pause()
+				// Use the new TogglePlayPause method that checks playing state
+				if _, err := mediaSvc.TogglePlayPause(); err != nil {
+					log.Printf("timo: media toggle failed: %v", err)
 				}
 			})
 		}

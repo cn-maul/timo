@@ -47,6 +47,10 @@ type TimoSettings struct {
 
 	// Hotkeys holds the global hotkey configuration.
 	Hotkeys HotkeyConfig `json:"hotkeys"`
+
+	// NetUnit controls how network speeds are displayed.
+	// Valid values: "auto" | "kb" | "mb"
+	NetUnit string `json:"netUnit,omitempty"`
 }
 
 // DefaultSettings returns the factory-default settings.
@@ -58,6 +62,7 @@ func DefaultSettings() TimoSettings {
 		ShowToolContext:    true,
 		ShowToolProgress:   true,
 		ShowSubagentDetails: true,
+		NetUnit:            "auto",
 	}
 }
 
@@ -88,6 +93,16 @@ func LoadSettings() (TimoSettings, error) {
 		return DefaultSettings(), err
 	}
 
+	// Parse raw JSON once to check which fields exist (avoids re-parsing per field).
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawFields); err != nil {
+		return DefaultSettings(), err
+	}
+	fieldExists := func(name string) bool {
+		_, ok := rawFields[name]
+		return ok
+	}
+
 	var s TimoSettings
 	if err := json.Unmarshal(data, &s); err != nil {
 		return DefaultSettings(), err
@@ -105,17 +120,17 @@ func LoadSettings() (TimoSettings, error) {
 		s.Theme = def.Theme
 	}
 	// New boolean fields default to true if not present
-	if !hasField(data, "showToolContext") {
+	if !fieldExists("showToolContext") {
 		s.ShowToolContext = def.ShowToolContext
 	}
-	if !hasField(data, "showToolProgress") {
+	if !fieldExists("showToolProgress") {
 		s.ShowToolProgress = def.ShowToolProgress
 	}
-	if !hasField(data, "showSubagentDetails") {
+	if !fieldExists("showSubagentDetails") {
 		s.ShowSubagentDetails = def.ShowSubagentDetails
 	}
 	// Hotkeys default
-	if !hasField(data, "hotkeys") {
+	if !fieldExists("hotkeys") {
 		s.Hotkeys = DefaultHotkeyConfig()
 	} else {
 		// Fill in missing hotkey fields with defaults
@@ -126,19 +141,23 @@ func LoadSettings() (TimoSettings, error) {
 		if s.Hotkeys.ToggleMedia == "" {
 			s.Hotkeys.ToggleMedia = hkDef.ToggleMedia
 		}
-		// Enabled defaults to true unless explicitly set false — but since
-		// missing struct fields are zero (false), we check the raw data.
-		var raw struct {
-			Hotkeys struct {
-				Enabled bool `json:"enabled"`
-			} `json:"hotkeys"`
-		}
-		json.Unmarshal(data, &raw)
-		if !hasField(data, "hotkeys") {
+		// hotkeys.enabled defaults to true unless explicitly set false
+		if !fieldExists("hotkeys") {
 			s.Hotkeys.Enabled = hkDef.Enabled
 		} else {
-			s.Hotkeys.Enabled = raw.Hotkeys.Enabled || s.Hotkeys.Enabled
+			// Check if the nested hotkeys object has an "enabled" field
+			var hkRaw struct {
+				Enabled bool `json:"enabled"`
+			}
+			if rawHK, hasRaw := rawFields["hotkeys"]; hasRaw {
+				json.Unmarshal(rawHK, &hkRaw)
+			}
+			s.Hotkeys.Enabled = hkRaw.Enabled || s.Hotkeys.Enabled
 		}
+	}
+	// NetUnit default
+	if !fieldExists("netUnit") {
+		s.NetUnit = def.NetUnit
 	}
 	return s, nil
 }

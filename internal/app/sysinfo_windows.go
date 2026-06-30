@@ -61,7 +61,8 @@ func NewSystemPoller(emitter func(SystemStats)) *SystemPoller {
 }
 
 func (p *SystemPoller) Start() {
-	// Prime network and disk readings
+	// Prime CPU, network, and disk readings
+	p.readCPU()
 	p.readNetBytes()
 	p.readDiskBytes()
 	go func() {

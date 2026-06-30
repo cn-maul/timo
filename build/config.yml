@@ -5,30 +5,13 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "Timo" # The name of the company
-  productName: "Timo" # The name of the application
-  productIdentifier: "com.timo.desktop" # The unique product identifier
-  description: "Desktop Dynamic Island — AI coding status, media playback, system monitoring" # The application description
-  copyright: "(c) 2025, Timo Contributors" # Copyright text
-  comments: "Timo — 桌面端的灵动岛" # Comments
-  version: "0.2.0" # The application version
-  # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
-  #                               # Should match the name of your .icon file without the extension
-  #                               # If not set and Assets.car exists, defaults to "appicon"
-
-# iOS build configuration (uncomment to customise iOS project generation)
-# Note: Keys under `ios` OVERRIDE values under `info` when set.
-# ios:
-#   # The iOS bundle identifier used in the generated Xcode project (CFBundleIdentifier)
-#   bundleID: "com.mycompany.myproduct"
-#   # The display name shown under the app icon (CFBundleDisplayName/CFBundleName)
-#   displayName: "My Product"
-#   # The app version to embed in Info.plist (CFBundleShortVersionString/CFBundleVersion)
-#   version: "0.0.1"
-#   # The company/organisation name for templates and project settings
-#   company: "My Company"
-#   # Additional comments to embed in Info.plist metadata
-#   comments: "Some Product Comments"
+  companyName: "Timo"
+  productName: "Timo"
+  productIdentifier: "com.timo.desktop"
+  description: "Desktop Dynamic Island — AI coding status, media playback, system monitoring"
+  copyright: "(c) 2025, Timo Contributors"
+  comments: "Timo — 桌面端的灵动岛"
+  version: "0.2.0"
 
 # Dev mode configuration
 dev_mode:

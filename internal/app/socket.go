@@ -9,20 +9,24 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
+// We use a fixed socket path since tryClaimInstance() enforces single-instance.
+// This avoids the fragile PID-file → PID → socket-path dance that can break
+// when /tmp is cleaned, PIDs are recycled, or files race.
 const (
-	pidFilePath = "/tmp/timo.pid"
-	sockPrefix  = "/tmp/timo-"
+	pidFilePath  = "/tmp/timo.pid"
+	socketPath   = "/tmp/timo.sock"
 )
 
-// getSocketPath returns the Unix socket path for this instance, derived from PID.
+// getSocketPath returns the fixed Unix socket path for this instance.
 func getSocketPath() string {
-	return sockPrefix + strconv.Itoa(os.Getpid()) + ".sock"
+	return socketPath
 }
 
-// ReadSocketPathFromPID reads the PID file and returns the socket path for that instance.
-// Returns empty string if no running instance is found.
+// ReadSocketPathFromPID reads the PID file and returns the socket path.
+// If the PID file is missing or the process is dead, returns empty string.
 func ReadSocketPathFromPID() string {
 	data, err := os.ReadFile(pidFilePath)
 	if err != nil {
@@ -45,7 +49,7 @@ func ReadSocketPathFromPID() string {
 		os.Remove(pidFilePath)
 		return ""
 	}
-	return sockPrefix + pidStr + ".sock"
+	return socketPath
 }
 
 // tryClaimInstance attempts to claim the Timo instance slot.
@@ -53,13 +57,13 @@ func ReadSocketPathFromPID() string {
 // Returns an error if another instance is already running.
 func tryClaimInstance() (string, error) {
 	if existingPath := ReadSocketPathFromPID(); existingPath != "" {
-		return "", fmt.Errorf("another Timo instance is already running (socket: %s)", existingPath)
+		return "", fmt.Errorf("another Timo instance is already running")
 	}
 	// Write our PID file
 	if err := os.WriteFile(pidFilePath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0644); err != nil {
 		return "", fmt.Errorf("cannot write PID file %s: %w", pidFilePath, err)
 	}
-	return getSocketPath(), nil
+	return socketPath, nil
 }
 
 // releaseInstance removes the PID file if it belongs to us.
@@ -127,6 +131,8 @@ func (s *NotifyServer) Start() error {
 
 func (s *NotifyServer) handleConn(conn net.Conn) {
 	defer conn.Close()
+	// Set a read deadline to prevent hanging on partial/malicious input
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	var notif Notification
 	if err := json.NewDecoder(conn).Decode(&notif); err != nil {
 		return

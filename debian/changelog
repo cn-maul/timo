@@ -1,3 +1,15 @@
+timo (0.2.0-1) unstable; urgency=medium
+
+  * 架构重构: hooks_shared.go 统一管理 hook 配置
+  * 固定 Unix socket 路径 /tmp/timo.sock，不再依赖 PID
+  * notify 静默退出(exit 0)避免 Timo 未运行时触发 hook 告警
+  * 媒体控制新增 TogglePlayPause
+  * 窗口位置边界保护
+  * 移除 Android/iOS/macOS 平台文件
+  * 新增 --topic 参数支持
+
+ -- cn-maul <your-email@example.com>  Mon, 30 Jun 2025 15:00:00 +0800
+
 timo (1.0.0-1) unstable; urgency=medium
 
   * Initial release.

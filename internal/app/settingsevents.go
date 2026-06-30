@@ -93,5 +93,10 @@ func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 		}
 	}
 
+	// Net unit
+	if netUnit, ok := m["netUnit"].(string); ok {
+		s.NetUnit = netUnit
+	}
+
 	return &s
 }
