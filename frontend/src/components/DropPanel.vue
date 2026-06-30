@@ -85,7 +85,7 @@ function formatDuration(ms: number): string {
         <div class="ai-history" v-if="settings.showToolProgress && recentTools.length > 0">
           <div class="history-title">最近操作</div>
           <div class="history-list">
-            <div v-for="(item, idx) in recentTools" :key="idx" class="history-item">
+            <div v-for="(item, idx) in recentTools" :key="item.tool + '-' + (item.target || '') + '-' + item.duration" class="history-item">
               <span class="history-icon">{{ notif.TOOL_ICONS[item.tool] || '🔧' }}</span>
               <span class="history-target">{{ item.target || item.tool }}</span>
               <span class="history-duration" v-if="item.duration">{{ formatDuration(item.duration) }}</span>

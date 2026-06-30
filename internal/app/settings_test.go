@@ -72,32 +72,6 @@ func TestDefaultSettings_Booleans(t *testing.T) {
 	}
 }
 
-func TestDefaultSettings_Hotkeys_ZeroValue(t *testing.T) {
-	// DefaultSettings() does not populate Hotkeys; they are only filled
-	// by LoadSettings() via DefaultHotkeyConfig() forward-compat logic.
-	s := DefaultSettings()
-	// Hotkeys struct should be zero-valued in DefaultSettings()
-	if s.Hotkeys.ToggleWindow != "" {
-		t.Errorf("expected empty ToggleWindow in DefaultSettings, got %q", s.Hotkeys.ToggleWindow)
-	}
-	if s.Hotkeys.ToggleMedia != "" {
-		t.Errorf("expected empty ToggleMedia in DefaultSettings, got %q", s.Hotkeys.ToggleMedia)
-	}
-}
-
-func TestDefaultHotkeyConfig_Values(t *testing.T) {
-	hk := DefaultHotkeyConfig()
-	if hk.ToggleWindow != "Ctrl+Shift+T" {
-		t.Errorf("expected default ToggleWindow 'Ctrl+Shift+T', got %q", hk.ToggleWindow)
-	}
-	if hk.ToggleMedia != "Ctrl+Shift+M" {
-		t.Errorf("expected default ToggleMedia 'Ctrl+Shift+M', got %q", hk.ToggleMedia)
-	}
-	if !hk.Enabled {
-		t.Error("expected hotkeys enabled by default")
-	}
-}
-
 func TestDefaultSettings_SerializesToValidJSON(t *testing.T) {
 	s := DefaultSettings()
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -150,11 +124,6 @@ func TestLoadSettings_ValidFile_LoadsCorrectly(t *testing.T) {
 		ShowToolContext:    false,
 		ShowToolProgress:   false,
 		ShowSubagentDetails: false,
-		Hotkeys: HotkeyConfig{
-			ToggleWindow: "Alt+T",
-			ToggleMedia:  "Alt+M",
-			Enabled:      false,
-		},
 	}
 	data, _ := json.MarshalIndent(custom, "", "  ")
 
@@ -177,9 +146,6 @@ func TestLoadSettings_ValidFile_LoadsCorrectly(t *testing.T) {
 	}
 	if s.ShowToolContext {
 		t.Error("expected ShowToolContext false")
-	}
-	if s.Hotkeys.ToggleWindow != "Alt+T" {
-		t.Errorf("expected ToggleWindow 'Alt+T', got %q", s.Hotkeys.ToggleWindow)
 	}
 }
 
@@ -259,62 +225,6 @@ func TestLoadSettings_PartialConfig_FillsDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadSettings_MissingHotkeys_FillsDefaults(t *testing.T) {
-	setTestHome(t)
-
-	// Settings without hotkeys field
-	partial := map[string]interface{}{
-		"theme": "dark",
-	}
-	data, _ := json.MarshalIndent(partial, "", "  ")
-
-	settingsPath := filepath.Join(os.Getenv("HOME"), ".config", "timo", "settings.json")
-	writeFile(t, settingsPath, data)
-
-	s, err := LoadSettings()
-	if err != nil {
-		t.Fatalf("LoadSettings: %v", err)
-	}
-
-	hkDef := DefaultHotkeyConfig()
-	if s.Hotkeys.ToggleWindow != hkDef.ToggleWindow {
-		t.Errorf("expected default ToggleWindow %q, got %q", hkDef.ToggleWindow, s.Hotkeys.ToggleWindow)
-	}
-	if s.Hotkeys.ToggleMedia != hkDef.ToggleMedia {
-		t.Errorf("expected default ToggleMedia %q, got %q", hkDef.ToggleMedia, s.Hotkeys.ToggleMedia)
-	}
-}
-
-func TestLoadSettings_PartialHotkeys_FillsMissingFields(t *testing.T) {
-	setTestHome(t)
-
-	// Settings with partial hotkeys
-	partial := map[string]interface{}{
-		"hotkeys": map[string]interface{}{
-			"toggleWindow": "Alt+T",
-		},
-	}
-	data, _ := json.MarshalIndent(partial, "", "  ")
-
-	settingsPath := filepath.Join(os.Getenv("HOME"), ".config", "timo", "settings.json")
-	writeFile(t, settingsPath, data)
-
-	s, err := LoadSettings()
-	if err != nil {
-		t.Fatalf("LoadSettings: %v", err)
-	}
-
-	if s.Hotkeys.ToggleWindow != "Alt+T" {
-		t.Errorf("expected ToggleWindow 'Alt+T', got %q", s.Hotkeys.ToggleWindow)
-	}
-
-	// Missing fields should get defaults
-	hkDef := DefaultHotkeyConfig()
-	if s.Hotkeys.ToggleMedia != hkDef.ToggleMedia {
-		t.Errorf("expected default ToggleMedia %q for missing field, got %q", hkDef.ToggleMedia, s.Hotkeys.ToggleMedia)
-	}
-}
-
 // ── SaveSettings tests ──
 
 func TestSaveSettings_CreatesFileAndDirs(t *testing.T) {
@@ -351,11 +261,6 @@ func TestSaveSettings_RoundTrip(t *testing.T) {
 		ShowToolContext:    false,
 		ShowToolProgress:   false,
 		ShowSubagentDetails: false,
-		Hotkeys: HotkeyConfig{
-			ToggleWindow: "Super+T",
-			ToggleMedia:  "Super+M",
-			Enabled:      false,
-		},
 	}
 
 	if err := SaveSettings(original); err != nil {
@@ -375,12 +280,6 @@ func TestSaveSettings_RoundTrip(t *testing.T) {
 	}
 	if loaded.ShowToolContext != original.ShowToolContext {
 		t.Errorf("showToolContext mismatch: %v vs %v", loaded.ShowToolContext, original.ShowToolContext)
-	}
-	if loaded.Hotkeys.ToggleWindow != original.Hotkeys.ToggleWindow {
-		t.Errorf("hotkey ToggleWindow mismatch: %q vs %q", loaded.Hotkeys.ToggleWindow, original.Hotkeys.ToggleWindow)
-	}
-	if loaded.Hotkeys.Enabled != original.Hotkeys.Enabled {
-		t.Errorf("hotkey Enabled mismatch: %v vs %v", loaded.Hotkeys.Enabled, original.Hotkeys.Enabled)
 	}
 }
 
@@ -423,6 +322,16 @@ func TestGetSettingsPath_EndsWithSettingsJSON(t *testing.T) {
 	if filepath.Base(path) != "settings.json" {
 		t.Errorf("expected settings path to end with 'settings.json', got %q", filepath.Base(path))
 	}
+}
+
+// hasField checks if a JSON object contains a given field.
+func hasField(data []byte, field string) bool {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return false
+	}
+	_, ok := raw[field]
+	return ok
 }
 
 // ── hasField tests ──

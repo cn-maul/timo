@@ -5,9 +5,6 @@ package app
 import (
 	"log"
 	"net"
-	"os/exec"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,7 +19,7 @@ const (
 	kbPerGB         = 1048576 // 1024 * 1024 kB per GB
 )
 
-// SystemStats holds CPU, memory, network, disk, and GPU stats.
+// SystemStats holds CPU, memory, network, disk stats.
 type SystemStats struct {
 	CPUPercent    float64 `json:"cpuPercent"`
 	MemPercent    float64 `json:"memPercent"`
@@ -33,8 +30,6 @@ type SystemStats struct {
 	LocalIP       string  `json:"localIP"`       // Primary local IP address
 	DiskReadKBps  float64 `json:"diskReadKBps"`  // Disk read speed in KB/s
 	DiskWriteKBps float64 `json:"diskWriteKBps"` // Disk write speed in KB/s
-	GpuPercent    float64 `json:"gpuPercent"`    // GPU usage (0 if unavailable)
-	GpuTemp       float64 `json:"gpuTemp"`       // GPU temperature in Celsius (0 if unavailable)
 }
 
 // SystemPoller periodically queries system stats using gopsutil.
@@ -66,6 +61,11 @@ func (p *SystemPoller) Start() {
 	p.readNetBytes()
 	p.readDiskBytes()
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: sysinfo poller panic recovered: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(sysPollInterval)
 		defer ticker.Stop()
 		for {
@@ -89,7 +89,6 @@ func (p *SystemPoller) poll() {
 	netDown, netUp := p.readNetSpeed()
 	ip := getLocalIP()
 	diskRead, diskWrite := p.readDiskSpeed()
-	gpuUsage, gpuTemp := p.readGPU()
 
 	memUsed := memTotal - memAvail
 	memPct := 0.0
@@ -107,8 +106,6 @@ func (p *SystemPoller) poll() {
 		LocalIP:       ip,
 		DiskReadKBps:  diskRead,
 		DiskWriteKBps: diskWrite,
-		GpuPercent:    gpuUsage,
-		GpuTemp:       gpuTemp,
 	})
 }
 
@@ -205,35 +202,6 @@ func (p *SystemPoller) readDiskSpeed() (readKBps, writeKBps float64) {
 	return readKBps, writeKBps
 }
 
-// readGPU returns GPU usage and temperature on Windows via nvidia-smi.
-func (p *SystemPoller) readGPU() (usage, temp float64) {
-	cmd := exec.Command("nvidia-smi",
-		"--query-gpu=utilization.gpu,temperature.gpu",
-		"--format=csv,noheader,nounits",
-	)
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, 0
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 {
-		return 0, 0
-	}
-
-	fields := strings.Split(lines[0], ",")
-	if len(fields) < 2 {
-		return 0, 0
-	}
-
-	u, err1 := strconv.ParseFloat(strings.TrimSpace(fields[0]), 64)
-	t, err2 := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64)
-	if err1 != nil || err2 != nil {
-		return 0, 0
-	}
-
-	return u, t
-}
 
 // getLocalIP returns the primary non-loopback IPv4 address.
 func getLocalIP() string {

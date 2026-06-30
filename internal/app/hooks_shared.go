@@ -446,14 +446,14 @@ func installHooks(isAuto bool, configDir string, typePrefix string, successMsg s
 	settings["hooks"] = merged
 
 	// Write back
-	if err := os.MkdirAll(configPath, 0755); err != nil {
+	if err := os.MkdirAll(configPath, 0700); err != nil {
 		return "", fmt.Errorf("cannot create %s: %w", configPath, err)
 	}
 	out, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("cannot encode settings: %w", err)
 	}
-	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
+	if err := os.WriteFile(settingsPath, append(out, '\n'), 0600); err != nil {
 		return "", fmt.Errorf("cannot write %s: %w", settingsPath, err)
 	}
 

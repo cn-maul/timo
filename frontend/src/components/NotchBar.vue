@@ -81,11 +81,6 @@ const diskWriteText = computed(() => {
   return `${(v / 1024).toFixed(1)}M`
 })
 
-const gpuText = computed(() => {
-  if (sys.gpuPercent === 0 && sys.gpuTemp === 0) return ''
-  if (sys.gpuTemp > 0) return `${Math.round(sys.gpuPercent)}% ${Math.round(sys.gpuTemp)}°C`
-  return `${Math.round(sys.gpuPercent)}%`
-})
 
 // Shorten workDir for display
 const shortDir = computed(() => {
@@ -262,7 +257,7 @@ const props = defineProps<{
       </div>
     </template>
 
-    <!-- Idle mode: conditional CPU / Mem / Net / Disk / GPU / Clock based on idleDisplay setting -->
+    <!-- Idle mode: conditional CPU / Mem / Net / Disk / Clock based on idleDisplay setting -->
     <template v-else-if="activeMode === 'idle'">
       <div class="notch-content">
         <div class="notch-left">
@@ -283,10 +278,6 @@ const props = defineProps<{
           <span class="sys-stat" v-if="settings.idleDisplay === 'all' && (sys.diskReadKBps > 100 || sys.diskWriteKBps > 100)">
             <span class="sys-label">DISK</span>
             <span class="sys-value">{{ diskReadText }}/{{ diskWriteText }}</span>
-          </span>
-          <span class="sys-stat" v-if="settings.idleDisplay === 'all' && gpuText">
-            <span class="sys-label">GPU</span>
-            <span class="sys-value">{{ gpuText }}</span>
           </span>
         </div>
         <div class="notch-right">

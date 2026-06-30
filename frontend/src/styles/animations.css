@@ -9,7 +9,7 @@
 .waveform-bar {
   width: 5px;
   height: 8px;
-  background: #fff;
+  background: var(--timo-text);
   border-radius: 2px;
   transition: height 0.15s ease;
 }
@@ -55,5 +55,23 @@
   100% {
     opacity: 0;
     transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .waveform-bar.playing {
+    animation: none;
+  }
+
+  .panel-enter-active,
+  .panel-leave-active {
+    animation: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .light-green,
+  .light-yellow {
+    animation: none;
   }
 }

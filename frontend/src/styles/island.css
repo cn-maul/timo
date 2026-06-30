@@ -363,17 +363,16 @@ html, body {
 }
 
 @keyframes progress-indeterminate {
-  0%   { width: 0%;   margin-left: 0; }
-  50%  { width: 60%;  margin-left: 20%; }
-  100% { width: 0%;   margin-left: 100%; }
+  0%   { width: 0%;   transform: translateX(0); }
+  50%  { width: 60%;  transform: translateX(33%); }
+  100% { width: 0%;   transform: translateX(100%); }
 }
 
 /* ── Drop panel ── */
 .drop-panel {
   position: absolute;
   top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 5%;
   width: 90%;
   background: var(--timo-surface);
   border-radius: 0 0 18px 18px;

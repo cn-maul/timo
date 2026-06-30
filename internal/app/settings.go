@@ -7,17 +7,6 @@ import (
 	"runtime"
 )
 
-// hasField checks if a JSON object has a specific field (case-insensitive for JSON key).
-func hasField(data []byte, field string) bool {
-	var obj map[string]interface{}
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return false
-	}
-	// JSON keys are case-sensitive in Go's json package
-	_, ok := obj[field]
-	return ok
-}
-
 // TimoSettings holds all user-configurable settings for Timo.
 type TimoSettings struct {
 	// DisplayPriority controls which activity mode takes precedence.
@@ -30,7 +19,7 @@ type TimoSettings struct {
 	IdleDisplay string `json:"idleDisplay"`
 
 	// Theme selects the UI color scheme.
-	// Valid values: "dark" | "light"
+	// Valid values: "dark" | "light" | "frosted"
 	Theme string `json:"theme"`
 
 	// ShowToolContext controls whether to show tool operation details.
@@ -44,9 +33,6 @@ type TimoSettings struct {
 	// ShowSubagentDetails controls whether to show subagent type and description.
 	// When true, displays agent type (Explore, Plan, etc.) and task description.
 	ShowSubagentDetails bool `json:"showSubagentDetails"`
-
-	// Hotkeys holds the global hotkey configuration.
-	Hotkeys HotkeyConfig `json:"hotkeys"`
 
 	// NetUnit controls how network speeds are displayed.
 	// Valid values: "auto" | "kb" | "mb"
@@ -129,32 +115,6 @@ func LoadSettings() (TimoSettings, error) {
 	if !fieldExists("showSubagentDetails") {
 		s.ShowSubagentDetails = def.ShowSubagentDetails
 	}
-	// Hotkeys default
-	if !fieldExists("hotkeys") {
-		s.Hotkeys = DefaultHotkeyConfig()
-	} else {
-		// Fill in missing hotkey fields with defaults
-		hkDef := DefaultHotkeyConfig()
-		if s.Hotkeys.ToggleWindow == "" {
-			s.Hotkeys.ToggleWindow = hkDef.ToggleWindow
-		}
-		if s.Hotkeys.ToggleMedia == "" {
-			s.Hotkeys.ToggleMedia = hkDef.ToggleMedia
-		}
-		// hotkeys.enabled defaults to true unless explicitly set false
-		if !fieldExists("hotkeys") {
-			s.Hotkeys.Enabled = hkDef.Enabled
-		} else {
-			// Check if the nested hotkeys object has an "enabled" field
-			var hkRaw struct {
-				Enabled bool `json:"enabled"`
-			}
-			if rawHK, hasRaw := rawFields["hotkeys"]; hasRaw {
-				json.Unmarshal(rawHK, &hkRaw)
-			}
-			s.Hotkeys.Enabled = hkRaw.Enabled || s.Hotkeys.Enabled
-		}
-	}
 	// NetUnit default
 	if !fieldExists("netUnit") {
 		s.NetUnit = def.NetUnit
@@ -173,5 +133,5 @@ func SaveSettings(s TimoSettings) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }

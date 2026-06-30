@@ -20,7 +20,7 @@ func SendNotification(notif Notification) error {
 	}
 	conn, err := net.Dial("unix", sockPath)
 	if err != nil {
-		return fmt.Errorf("Timo is not running. Start Timo GUI first (run 'timo'), then retry. (%v)", err)
+		return fmt.Errorf("Timo is not running. Start Timo GUI first (run 'timo'), then retry: %w", err)
 	}
 	defer conn.Close()
 	return json.NewEncoder(conn).Encode(notif)

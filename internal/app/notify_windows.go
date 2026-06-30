@@ -42,6 +42,11 @@ func (s *NotifyServer) Start() error {
 	s.listener = ln
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: notify server panic recovered: %v", r)
+			}
+		}()
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
@@ -220,6 +225,11 @@ func NewProcessMonitor(watchNames []string, emitter func(Notification)) *Process
 
 func (m *ProcessMonitor) Start() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: process monitor panic recovered: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 
@@ -295,7 +305,7 @@ func countProcesses(name string) int {
 func SendNotification(notif Notification) error {
 	conn, err := dialPipe(pipePath)
 	if err != nil {
-		return fmt.Errorf("Timo is not running. Start Timo GUI first, then retry. %w", err)
+		return fmt.Errorf("Timo is not running. Start Timo GUI first, then retry: %w", err)
 	}
 	defer conn.Close()
 	return json.NewEncoder(conn).Encode(notif)

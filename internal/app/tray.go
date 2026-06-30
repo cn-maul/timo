@@ -16,14 +16,14 @@ var trayIconFS embed.FS
 // It is used by both setupSystemTray and UpdateTrayStatus to avoid code duplication.
 // The callbacks allow each caller to provide its own behavior for each action.
 func buildTrayMenu(
-	tray *application.SystemTray,
-	settings TimoSettings,
-	bus EventBus,
-	win WindowController,
-	toggleWindow func(),
-	openSettings func(),
-	quit func(),
-) {
+		tray *application.SystemTray,
+		settings TimoSettings,
+		bus EventBus,
+		win WindowController,
+		toggleWindow func(),
+		openSettings func(),
+		quit func(),
+	) {
 	menu := application.NewMenu()
 
 	menu.Add("显示/隐藏 Timo").OnClick(func(ctx *application.Context) {
@@ -46,9 +46,11 @@ func buildTrayMenu(
 	darkItem.OnClick(func(ctx *application.Context) {
 		s, _ := LoadSettings()
 		s.Theme = "dark"
-		SaveSettings(s)
+		if err := SaveSettings(s); err != nil {
+			log.Printf("timo: failed to save settings: %v", err)
+		}
 		if bus != nil {
-			bus.Emit("settings-loaded", &s)
+			bus.Emit("settings-updated", &s)
 		}
 		UpdateTrayStatus(tray, s, bus, win, quit)
 	})
@@ -60,9 +62,11 @@ func buildTrayMenu(
 	lightItem.OnClick(func(ctx *application.Context) {
 		s, _ := LoadSettings()
 		s.Theme = "light"
-		SaveSettings(s)
+		if err := SaveSettings(s); err != nil {
+			log.Printf("timo: failed to save settings: %v", err)
+		}
 		if bus != nil {
-			bus.Emit("settings-loaded", &s)
+			bus.Emit("settings-updated", &s)
 		}
 		UpdateTrayStatus(tray, s, bus, win, quit)
 	})
@@ -74,9 +78,11 @@ func buildTrayMenu(
 	frostedItem.OnClick(func(ctx *application.Context) {
 		s, _ := LoadSettings()
 		s.Theme = "frosted"
-		SaveSettings(s)
+		if err := SaveSettings(s); err != nil {
+			log.Printf("timo: failed to save settings: %v", err)
+		}
 		if bus != nil {
-			bus.Emit("settings-loaded", &s)
+			bus.Emit("settings-updated", &s)
 		}
 		UpdateTrayStatus(tray, s, bus, win, quit)
 	})

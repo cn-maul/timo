@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/json"
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -40,6 +39,33 @@ func parseSettings(data interface{}) *TimoSettings {
 	return nil
 }
 
+// validIdleDisplay returns true if the given idleDisplay value is valid.
+func validIdleDisplay(v string) bool {
+	switch v {
+	case "all", "cpu", "mem", "net", "none":
+		return true
+	}
+	return false
+}
+
+// validTheme returns true if the given theme value is valid.
+func validTheme(v string) bool {
+	switch v {
+	case "dark", "light", "frosted":
+		return true
+	}
+	return false
+}
+
+// validDisplayPriorityItem returns true if a displayPriority entry is valid.
+func validDisplayPriorityItem(v string) bool {
+	switch v {
+	case "ai", "media":
+		return true
+	}
+	return false
+}
+
 // parseSettingsMap converts a generic map (from frontend JSON) to TimoSettings.
 func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 	s := DefaultSettings()
@@ -47,8 +73,8 @@ func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 	if priorities, ok := m["displayPriority"].([]interface{}); ok {
 		strs := make([]string, 0, len(priorities))
 		for _, p := range priorities {
-			if s, ok := p.(string); ok {
-				strs = append(strs, s)
+			if str, ok := p.(string); ok && validDisplayPriorityItem(str) {
+				strs = append(strs, str)
 			}
 		}
 		if len(strs) > 0 {
@@ -56,11 +82,11 @@ func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 		}
 	}
 
-	if idle, ok := m["idleDisplay"].(string); ok {
+	if idle, ok := m["idleDisplay"].(string); ok && validIdleDisplay(idle) {
 		s.IdleDisplay = idle
 	}
 
-	if theme, ok := m["theme"].(string); ok {
+	if theme, ok := m["theme"].(string); ok && validTheme(theme) {
 		s.Theme = theme
 	}
 
@@ -75,27 +101,12 @@ func parseSettingsMap(m map[string]interface{}) *TimoSettings {
 		s.ShowSubagentDetails = v
 	}
 
-	// Hotkeys config
-	if hkRaw, ok := m["hotkeys"]; ok {
-		var rawHotkey struct {
-			Enabled bool `json:"enabled"`
-			ToggleWindow string `json:"toggleWindow"`
-			ToggleMedia string `json:"toggleMedia"`
-		}
-		hkJSON, err := json.Marshal(hkRaw)
-		if err == nil && string(hkJSON) != "null" {
-			json.Unmarshal(hkJSON, &rawHotkey)
-			s.Hotkeys.Enabled = rawHotkey.Enabled
-			s.Hotkeys.ToggleWindow = rawHotkey.ToggleWindow
-			s.Hotkeys.ToggleMedia = rawHotkey.ToggleMedia
-		} else if !rawHotkey.Enabled {
-			s.Hotkeys.Enabled = true // default on for backward compatibility
-		}
-	}
-
 	// Net unit
 	if netUnit, ok := m["netUnit"].(string); ok {
-		s.NetUnit = netUnit
+		switch netUnit {
+		case "auto", "kb", "mb":
+			s.NetUnit = netUnit
+		}
 	}
 
 	return &s

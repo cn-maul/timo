@@ -5,10 +5,12 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -60,7 +62,7 @@ func tryClaimInstance() (string, error) {
 		return "", fmt.Errorf("another Timo instance is already running")
 	}
 	// Write our PID file
-	if err := os.WriteFile(pidFilePath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0644); err != nil {
+	if err := os.WriteFile(pidFilePath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0600); err != nil {
 		return "", fmt.Errorf("cannot write PID file %s: %w", pidFilePath, err)
 	}
 	return socketPath, nil
@@ -83,12 +85,14 @@ type NotifyServer struct {
 	callback func(Notification)
 	stopCh   chan struct{}
 	sockPath string
+	connSem  chan struct{} // limits concurrent handler goroutines
 }
 
 func NewNotifyServer(callback func(Notification)) *NotifyServer {
 	return &NotifyServer{
 		callback: callback,
 		stopCh:   make(chan struct{}),
+		connSem:  make(chan struct{}, 32),
 	}
 }
 
@@ -102,13 +106,24 @@ func (s *NotifyServer) Start() error {
 	// Ensure old socket is removed (shouldn't exist, but be safe)
 	os.Remove(sockPath)
 
+	// Tighten umask before listening so the socket is created with restrictive permissions
+	oldMask := syscall.Umask(0o077)
+
 	ln, err := net.Listen("unix", sockPath)
+
+	// Restore umask immediately after listen
+	syscall.Umask(oldMask)
+
 	if err != nil {
 		releaseInstance()
 		return fmt.Errorf("failed to listen on %s: %w", sockPath, err)
 	}
-	// Set permissions immediately after socket creation to minimize exposure
-	os.Chmod(sockPath, 0600)
+	// Ensure restrictive permissions (belt-and-suspenders with umask)
+	if err := os.Chmod(sockPath, 0600); err != nil {
+		ln.Close()
+		releaseInstance()
+		return fmt.Errorf("failed to set socket permissions: %w", err)
+	}
 	s.listener = ln
 
 	go func() {
@@ -122,7 +137,22 @@ func (s *NotifyServer) Start() error {
 					continue
 				}
 			}
-			go s.handleConn(conn)
+			// Acquire semaphore slot; if at capacity, drop the connection
+			select {
+			case s.connSem <- struct{}{}:
+			default:
+				conn.Close()
+				continue
+			}
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("timo: connection handler panic recovered: %v", r)
+					}
+				}()
+				defer func() { <-s.connSem }()
+				s.handleConn(conn)
+			}()
 		}
 	}()
 
@@ -132,7 +162,9 @@ func (s *NotifyServer) Start() error {
 func (s *NotifyServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	// Set a read deadline to prevent hanging on partial/malicious input
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("timo: failed to set read deadline: %v", err)
+	}
 	var notif Notification
 	if err := json.NewDecoder(conn).Decode(&notif); err != nil {
 		return

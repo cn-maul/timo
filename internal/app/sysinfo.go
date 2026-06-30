@@ -7,8 +7,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,7 +18,7 @@ const (
 	kbPerGB         = 1048576 // 1024 * 1024 kB per GB
 )
 
-// SystemStats holds CPU, memory, network, disk, and GPU stats.
+// SystemStats holds CPU, memory, network, disk stats.
 type SystemStats struct {
 	CPUPercent    float64 `json:"cpuPercent"`
 	MemPercent    float64 `json:"memPercent"`
@@ -31,8 +29,6 @@ type SystemStats struct {
 	LocalIP       string  `json:"localIP"`       // Primary local IP address
 	DiskReadKBps  float64 `json:"diskReadKBps"`  // Disk read speed in KB/s
 	DiskWriteKBps float64 `json:"diskWriteKBps"` // Disk write speed in KB/s
-	GpuPercent    float64 `json:"gpuPercent"`    // GPU usage (0 if unavailable)
-	GpuTemp       float64 `json:"gpuTemp"`       // GPU temperature in Celsius (0 if unavailable)
 }
 
 // SystemPoller periodically reads /proc for system stats.
@@ -69,6 +65,11 @@ func (p *SystemPoller) Start() {
 	p.readNetBytes()
 	p.readDiskBytes()
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: sysinfo poller panic recovered: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(sysPollInterval)
 		defer ticker.Stop()
 		for {
@@ -92,7 +93,6 @@ func (p *SystemPoller) poll() {
 	netDown, netUp := p.readNetSpeed()
 	ip := getLocalIP()
 	diskRead, diskWrite := p.readDiskSpeed()
-	gpuUsage, gpuTemp := p.readGPU()
 
 	memUsed := memTotal - memAvail
 	memPct := 0.0
@@ -110,8 +110,6 @@ func (p *SystemPoller) poll() {
 		LocalIP:       ip,
 		DiskReadKBps:  diskRead,
 		DiskWriteKBps: diskWrite,
-		GpuPercent:    gpuUsage,
-		GpuTemp:       gpuTemp,
 	})
 }
 
@@ -269,10 +267,35 @@ func (p *SystemPoller) readDiskBytes() (read, write uint64) {
 		if len(fields) < 10 {
 			continue
 		}
-		// Skip partition devices (numbers in name) and loop devices
+		// Skip partition devices and loop devices.
+		// Loop devices: "loop0", "loop1", etc.
+		// Partitions: device names ending with a digit that have no letters
+		// after the last digit (e.g., "sda1", "nvme0n1p1").
+		// Whole disks: "sda", "nvme0n1" — they end with a letter or have
+		// letters after the last digit.
 		device := fields[2]
-		if strings.HasPrefix(device, "loop") || strings.ContainsAny(device, "0123456789") {
+		if strings.HasPrefix(device, "loop") {
 			continue
+		}
+		// Find last digit; if no letter follows, treat as partition
+		lastDigitIdx := -1
+		for i, c := range device {
+			if c >= '0' && c <= '9' {
+				lastDigitIdx = i
+			}
+		}
+		if lastDigitIdx >= 0 {
+			hasLetterAfterDigit := false
+			for i := lastDigitIdx + 1; i < len(device); i++ {
+				c := device[i]
+				if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+					hasLetterAfterDigit = true
+					break
+				}
+			}
+			if !hasLetterAfterDigit {
+				continue // partition (e.g. sda1, nvme0n1p1)
+			}
 		}
 		// fields[3] = reads completed, fields[5] = sectors read
 		// fields[7] = writes completed, fields[9] = sectors written
@@ -302,89 +325,6 @@ func (p *SystemPoller) readDiskSpeed() (readKBps, writeKBps float64) {
 	readKBps = float64(dRead) / 1024.0 / intervalSec
 	writeKBps = float64(dWrite) / 1024.0 / intervalSec
 	return readKBps, writeKBps
-}
-
-// readGPU attempts to read GPU usage and temperature.
-// Supports NVIDIA (via nvidia-smi) and AMD (via sysfs).
-func (p *SystemPoller) readGPU() (usage, temp float64) {
-	// Try NVIDIA first
-	if usage, temp := p.readNvidiaGPU(); usage > 0 || temp > 0 {
-		return usage, temp
-	}
-	// Try AMD
-	return p.readAmdGPU()
-}
-
-// readNvidiaGPU reads GPU utilization and temperature via nvidia-smi.
-func (p *SystemPoller) readNvidiaGPU() (usage, temp float64) {
-	// Check if nvidia-smi exists
-	if _, err := os.Stat("/usr/bin/nvidia-smi"); os.IsNotExist(err) {
-		return 0, 0
-	}
-
-	// Query GPU utilization and temperature using nvidia-smi CSV output
-	cmd := exec.Command("nvidia-smi",
-		"--query-gpu=utilization.gpu,temperature.gpu",
-		"--format=csv,noheader,nounits",
-	)
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, 0
-	}
-
-	// Parse the first line (first GPU): "  45, 62"
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 {
-		return 0, 0
-	}
-
-	fields := strings.Split(lines[0], ",")
-	if len(fields) < 2 {
-		return 0, 0
-	}
-
-	u, err1 := strconv.ParseFloat(strings.TrimSpace(fields[0]), 64)
-	t, err2 := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64)
-	if err1 != nil || err2 != nil {
-		return 0, 0
-	}
-
-	return u, t
-}
-
-// readAmdGPU reads from AMD GPU sysfs interface.
-func (p *SystemPoller) readAmdGPU() (usage, temp float64) {
-	// AMD GPU stats are in /sys/class/drm/card*/device/
-	// Look for card0, card1, etc.
-	matches, err := filepath.Glob("/sys/class/drm/card*/device/gpu_busy_percent")
-	if err != nil || len(matches) == 0 {
-		return 0, 0
-	}
-
-	// Read from the first available GPU
-	for _, path := range matches {
-		data, err := os.ReadFile(path)
-		if err == nil {
-			if u, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64); err == nil {
-				usage = u
-				break
-			}
-		}
-	}
-
-	// Try to read temperature
-	tempPaths, _ := filepath.Glob("/sys/class/drm/card*/device/hwmon/hwmon*/temp1_input")
-	for _, path := range tempPaths {
-		data, err := os.ReadFile(path)
-		if err == nil {
-			if t, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64); err == nil {
-				temp = t / 1000.0 // Convert millidegrees to degrees
-				break
-			}
-		}
-	}
-
-	return usage, temp
 }
 
 // getLocalIP returns the primary non-loopback IPv4 address.

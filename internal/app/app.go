@@ -177,38 +177,6 @@ func Run(assets embed.FS) {
 	// Register all event handlers (moved to events.go)
 	registerAllEventHandlers(wailsApp, tray, wailsApp.Event, win, func() { wailsApp.Quit() }, settingsWinMgr)
 
-	// Global/app-level hotkeys
-	initialSettings, _ := LoadSettings()
-	hotkeyManager, hotkeyErr := NewGlobalHotkeyManager()
-	if hotkeyErr != nil {
-		log.Printf("timo: hotkey manager unavailable: %v", hotkeyErr)
-	}
-	if hotkeyManager != nil {
-		// Toggle window hotkey
-		if initialSettings.Hotkeys.Enabled && initialSettings.Hotkeys.ToggleWindow != "" {
-			hotkeyManager.Register(initialSettings.Hotkeys.ToggleWindow, func() {
-				if win.IsMinimised() || !win.IsVisible() {
-					win.Show()
-					win.Focus()
-				} else {
-					win.Minimise()
-				}
-			})
-		}
-		// Toggle media hotkey
-		if initialSettings.Hotkeys.Enabled && initialSettings.Hotkeys.ToggleMedia != "" && mediaSvc != nil {
-			hotkeyManager.Register(initialSettings.Hotkeys.ToggleMedia, func() {
-				// Use the new TogglePlayPause method that checks playing state
-				if _, err := mediaSvc.TogglePlayPause(); err != nil {
-					log.Printf("timo: media toggle failed: %v", err)
-				}
-			})
-		}
-		hotkeyManager.logStatus()
-		// Wire app-level keybindings (work when window has focus)
-		setupAppHotkeys(wailsApp, &initialSettings, hotkeyManager)
-	}
-
 	// Defer cleanup so it runs even on panic
 	cleanup := func() {
 		notifServer.Stop()

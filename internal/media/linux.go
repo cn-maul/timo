@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -28,6 +29,8 @@ type LinuxProvider struct {
 	// Signal subscription
 	signalChan chan struct{}
 	signalStop chan struct{}
+
+	mu sync.Mutex
 }
 
 // NewLinuxProvider connects to the session bus.
@@ -72,6 +75,9 @@ func (p *LinuxProvider) getPlayerObject() (dbus.BusObject, error) {
 }
 
 func (p *LinuxProvider) GetState() (*MediaInfo, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	obj, err := p.getPlayerObject()
 	if err != nil {
 		return nil, err
@@ -151,6 +157,8 @@ func (p *LinuxProvider) GetState() (*MediaInfo, error) {
 }
 
 func (p *LinuxProvider) callPlayerMethod(method string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	obj, err := p.getPlayerObject()
 	if err != nil {
 		return err
@@ -167,6 +175,8 @@ func (p *LinuxProvider) Previous() error { return p.callPlayerMethod("Previous")
 // Uses the cached track ID from the last GetState() call,
 // as required by the MPRIS specification.
 func (p *LinuxProvider) SeekTo(positionMs int64) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	obj, err := p.getPlayerObject()
 	if err != nil {
 		return err
@@ -185,6 +195,8 @@ func (p *LinuxProvider) SeekTo(positionMs int64) error {
 
 // SetShuffle enables or disables shuffle mode.
 func (p *LinuxProvider) SetShuffle(enabled bool) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	obj, err := p.getPlayerObject()
 	if err != nil {
 		return err
@@ -195,6 +207,8 @@ func (p *LinuxProvider) SetShuffle(enabled bool) error {
 // SetRepeat sets the repeat mode.
 // mode: 0 = None, 1 = One, 2 = All
 func (p *LinuxProvider) SetRepeat(mode int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	obj, err := p.getPlayerObject()
 	if err != nil {
 		return err
@@ -252,6 +266,8 @@ func (p *LinuxProvider) GetSessions() ([]MediaSession, error) {
 
 // GetCapabilities returns what operations the current player supports.
 func (p *LinuxProvider) GetCapabilities() (*MediaCapabilities, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	obj, err := p.getPlayerObject()
 	if err != nil {
 		return &MediaCapabilities{}, err
@@ -299,12 +315,15 @@ func (p *LinuxProvider) GetCapabilities() (*MediaCapabilities, error) {
 // The caller should read from this channel and call GetState() to fetch the
 // latest state, ensuring the polling loop has up-to-date data instantly.
 func (p *LinuxProvider) SubscribeSignals() (<-chan struct{}, error) {
+	p.mu.Lock()
 	if p.signalChan != nil {
+		p.mu.Unlock()
 		return p.signalChan, nil
 	}
 
 	p.signalChan = make(chan struct{}, 16)
 	p.signalStop = make(chan struct{})
+	p.mu.Unlock()
 
 	// Match rule: listen for PropertiesChanged on the MPRIS Player interface
 	// from any MPRIS player bus name.
@@ -314,6 +333,10 @@ func (p *LinuxProvider) SubscribeSignals() (<-chan struct{}, error) {
 	)
 	busObj := p.conn.BusObject()
 	if err := busObj.Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
+		p.mu.Lock()
+		p.signalChan = nil
+		p.signalStop = nil
+		p.mu.Unlock()
 		return nil, fmt.Errorf("failed to add D-Bus match: %w", err)
 	}
 
@@ -322,6 +345,11 @@ func (p *LinuxProvider) SubscribeSignals() (<-chan struct{}, error) {
 	p.conn.Signal(signalCh)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: media signal handler panic recovered: %v", r)
+			}
+		}()
 		defer func() {
 			p.conn.RemoveSignal(signalCh)
 			// Try to remove the match (best-effort)
@@ -364,6 +392,8 @@ func (p *LinuxProvider) SubscribeSignals() (<-chan struct{}, error) {
 
 // UnsubscribeSignals stops the signal listener goroutine and removes D-Bus match.
 func (p *LinuxProvider) UnsubscribeSignals() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.signalStop == nil {
 		return
 	}

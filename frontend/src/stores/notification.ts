@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { Notification } from '../../bindings/timo/internal/app/models'
+import type { Notification } from '../../bindings/timo/internal/app/models'
 
 const DONE_CLEAR_DELAY = 5000
 const ATTENTION_CLEAR_DELAY = 8000

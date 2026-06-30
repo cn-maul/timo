@@ -5,6 +5,7 @@ package app
 import (
 	"os"
 	"strings"
+	"log"
 	"time"
 )
 
@@ -12,11 +13,13 @@ var selfPID string
 
 func init() {
 	data, err := os.ReadFile("/proc/self/stat")
-	if err == nil {
-		fields := strings.SplitN(string(data), " ", 2)
-		if len(fields) > 0 {
-			selfPID = fields[0]
-		}
+	if err != nil {
+		log.Printf("timo: failed to read /proc/self/stat: %v", err)
+		return
+	}
+	fields := strings.SplitN(string(data), " ", 2)
+	if len(fields) > 0 {
+		selfPID = fields[0]
 	}
 }
 
@@ -45,6 +48,11 @@ func NewProcessMonitor(watchNames []string, emitter func(Notification)) *Process
 
 func (m *ProcessMonitor) Start() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: process monitor panic recovered: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 

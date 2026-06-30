@@ -20,7 +20,9 @@ func NewSettingsService(bus EventBus) *SettingsService {
 	if err != nil {
 		log.Printf("timo: failed to load settings, using defaults: %v", err)
 		s = DefaultSettings()
-		_ = SaveSettings(s)
+		if err := SaveSettings(s); err != nil {
+			log.Printf("timo: failed to save default settings: %v", err)
+		}
 	}
 	log.Printf("timo: settings loaded from %s", GetSettingsPath())
 	return &SettingsService{bus: bus, settings: s}

@@ -1,6 +1,7 @@
 package media
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -20,9 +21,8 @@ type Poller struct {
 	signalChan <-chan struct{}
 
 	// Guard against double-Start and safe multi-Stop
-	mu       sync.Mutex
-	running  bool
-	stopOnce sync.Once
+	mu      sync.Mutex
+	running bool
 }
 
 // NewPoller creates a new Poller.
@@ -55,10 +55,14 @@ func (p *Poller) Start() {
 	}
 	p.running = true
 	p.stop = make(chan struct{})
-	p.stopOnce = sync.Once{}
 	p.mu.Unlock()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("timo: media poller panic recovered: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(p.interval)
 		defer ticker.Stop()
 
@@ -85,10 +89,8 @@ func (p *Poller) Stop() {
 	if !p.running {
 		return
 	}
-	p.stopOnce.Do(func() {
-		close(p.stop)
-		p.running = false
-	})
+	close(p.stop)
+	p.running = false
 }
 
 func (p *Poller) fetchAndEmit() {

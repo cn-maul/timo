@@ -44,6 +44,22 @@ const hooksStatus = ref({
 const hooksLoading = ref(false)
 const hooksFeedback = ref('')
 
+// Store timeout IDs for proper cleanup
+const feedbackTimers: ReturnType<typeof setTimeout>[] = []
+const loadingTimers: ReturnType<typeof setTimeout>[] = []
+
+// Track active setTimeout IDs for cleanup
+const pendingTimers: ReturnType<typeof setTimeout>[] = []
+
+function scheduleTimer(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
+  const id = setTimeout(() => {
+    pendingTimers.splice(pendingTimers.indexOf(id), 1)
+    fn()
+  }, ms)
+  pendingTimers.push(id)
+  return id
+}
+
 onMounted(() => {
   if (settings.loaded) {
     localPriority.value = [...settings.displayPriority]
@@ -69,21 +85,26 @@ const unsubLoaded = settings.$subscribe(() => {
   }
 })
 
-Events.On('hooks-status', (event: { data: typeof hooksStatus.value }) => {
+const unsubHooksStatus = Events.On('hooks-status', (event: { data: typeof hooksStatus.value }) => {
   if (event.data) {
     hooksStatus.value = event.data
   }
 })
 
-Events.On('hooks-feedback', (event: { data: string }) => {
+const unsubHooksFeedback = Events.On('hooks-feedback', (event: { data: string }) => {
   if (event.data) {
     hooksFeedback.value = event.data
-    setTimeout(() => { hooksFeedback.value = '' }, 3000)
+    scheduleTimer(() => { hooksFeedback.value = '' }, 3000)
   }
 })
 
 onUnmounted(() => {
   unsubLoaded()
+  unsubHooksStatus()
+  unsubHooksFeedback()
+  // Clear all pending timers to prevent callbacks after unmount
+  pendingTimers.forEach(id => clearTimeout(id))
+  pendingTimers.length = 0
 })
 
 function togglePriority(mode: string) {
@@ -127,19 +148,19 @@ function resetDefaults() {
 function injectHook(tool: 'claude' | 'reasonix') {
   hooksLoading.value = true
   Events.Emit('inject-hook', tool)
-  setTimeout(() => { hooksLoading.value = false }, 1000)
+  scheduleTimer(() => { hooksLoading.value = false }, 1000)
 }
 
 function injectAllHooks() {
   hooksLoading.value = true
   Events.Emit('inject-hook', 'all')
-  setTimeout(() => { hooksLoading.value = false }, 1000)
+  scheduleTimer(() => { hooksLoading.value = false }, 1000)
 }
 
 function removeHook(tool: 'claude' | 'reasonix') {
   hooksLoading.value = true
   Events.Emit('remove-hook', tool)
-  setTimeout(() => { hooksLoading.value = false }, 1000)
+  scheduleTimer(() => { hooksLoading.value = false }, 1000)
 }
 
 function closeSettings() {
@@ -410,7 +431,7 @@ function onDragStart(e: MouseEvent) {
 .settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--timo-overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
