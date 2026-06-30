@@ -1,12 +1,13 @@
 //go:build linux
 
-package main
+package app
 
 import (
 	"bufio"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -314,24 +315,41 @@ func (p *SystemPoller) readGPU() (usage, temp float64) {
 	return p.readAmdGPU()
 }
 
-// readNvidiaGPU reads from nvidia-smi if available.
+// readNvidiaGPU reads GPU utilization and temperature via nvidia-smi.
 func (p *SystemPoller) readNvidiaGPU() (usage, temp float64) {
 	// Check if nvidia-smi exists
 	if _, err := os.Stat("/usr/bin/nvidia-smi"); os.IsNotExist(err) {
 		return 0, 0
 	}
 
-	// Read GPU stats from nvidia-smi
-	// We use a simple approach: query utilization.gpu and temperature.gpu
-	f, err := os.Open("/proc/driver/nvidia/gpus/0/information")
+	// Query GPU utilization and temperature using nvidia-smi CSV output
+	cmd := exec.Command("nvidia-smi",
+		"--query-gpu=utilization.gpu,temperature.gpu",
+		"--format=csv,noheader,nounits",
+	)
+	out, err := cmd.Output()
 	if err != nil {
 		return 0, 0
 	}
-	defer f.Close()
 
-	// Alternative: parse nvidia-smi output (slower but more reliable)
-	// For now, just return 0 and let the fallback handle it
-	return 0, 0
+	// Parse the first line (first GPU): "  45, 62"
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 {
+		return 0, 0
+	}
+
+	fields := strings.Split(lines[0], ",")
+	if len(fields) < 2 {
+		return 0, 0
+	}
+
+	u, err1 := strconv.ParseFloat(strings.TrimSpace(fields[0]), 64)
+	t, err2 := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64)
+	if err1 != nil || err2 != nil {
+		return 0, 0
+	}
+
+	return u, t
 }
 
 // readAmdGPU reads from AMD GPU sysfs interface.

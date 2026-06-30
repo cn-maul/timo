@@ -1,6 +1,6 @@
 //go:build linux
 
-package main
+package app
 
 /*
 #cgo pkg-config: gtk4 x11

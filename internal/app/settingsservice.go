@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"log"
@@ -9,12 +9,13 @@ import (
 // frontend and emits "settings-updated" events on every change.
 type SettingsService struct {
 	mu       sync.Mutex
+	bus      EventBus
 	settings TimoSettings
 }
 
 // NewSettingsService loads persisted settings (or creates defaults) and
 // returns a ready-to-use service.
-func NewSettingsService() *SettingsService {
+func NewSettingsService(bus EventBus) *SettingsService {
 	s, err := LoadSettings()
 	if err != nil {
 		log.Printf("timo: failed to load settings, using defaults: %v", err)
@@ -22,7 +23,7 @@ func NewSettingsService() *SettingsService {
 		_ = SaveSettings(s)
 	}
 	log.Printf("timo: settings loaded from %s", GetSettingsPath())
-	return &SettingsService{settings: s}
+	return &SettingsService{bus: bus, settings: s}
 }
 
 // Get returns the current in-memory settings snapshot.
@@ -32,19 +33,23 @@ func (s *SettingsService) Get() TimoSettings {
 	return s.settings
 }
 
-// Update replaces the in-memory settings, persists them to disk, and emits a
-// "settings-updated" event so the frontend and tray can react.
+// Update persists settings to disk first, then updates the in-memory copy so
+// that a disk failure does not leave the UI showing unsaved settings. On
+// failure it returns the previously-stored settings and does not emit the
+// "settings-updated" event.
 func (s *SettingsService) Update(settings TimoSettings) TimoSettings {
 	s.mu.Lock()
+	if err := SaveSettings(settings); err != nil {
+		log.Printf("timo: failed to save settings: %v", err)
+		old := s.settings
+		s.mu.Unlock()
+		return old
+	}
 	s.settings = settings
 	s.mu.Unlock()
 
-	if err := SaveSettings(settings); err != nil {
-		log.Printf("timo: failed to save settings: %v", err)
-	}
-
-	if mainApp != nil {
-		mainApp.Event.Emit("settings-updated", &settings)
+	if s.bus != nil {
+		s.bus.Emit("settings-updated", &settings)
 	}
 
 	return settings

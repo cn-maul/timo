@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Timo
+Comment=Desktop notification panel for Claude Code and Reasonix
+Exec=timo
+Icon=timo
+Terminal=false
+Type=Application
+Categories=Utility;DesktopApp;
+StartupNotify=true
+StartupWMClass=timo

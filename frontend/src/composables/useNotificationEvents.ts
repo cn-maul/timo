@@ -1,6 +1,6 @@
 import { Events } from '@wailsio/runtime'
 import { useNotificationStore } from '../stores/notification'
-import type { Notification } from '../../bindings/timo/models'
+import type { Notification } from '../../bindings/timo/internal/app/models'
 
 export function useNotificationEvents() {
   const store = useNotificationStore()

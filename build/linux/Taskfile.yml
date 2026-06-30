@@ -29,6 +29,8 @@ tasks:
           EXTRA_TAGS: '{{.EXTRA_TAGS}}'
           OBFUSCATED: '{{.OBFUSCATED}}'
           GARBLE_ARGS: '{{.GARBLE_ARGS}}'
+      # Sync the built binary to the project root so `./timo` always runs the latest build
+      - cmd: cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.ROOT_DIR}}/{{.APP_NAME}}"
     vars:
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'

@@ -175,7 +175,7 @@ function onDragStart(e: MouseEvent) {
       <!-- Header -->
       <div class="settings-header" @mousedown="onDragStart">
         <h2>设置</h2>
-        <button class="close-btn" @click.stop="closeSettings">✕</button>
+        <button class="close-btn" aria-label="关闭设置" @click.stop="closeSettings">✕</button>
       </div>
 
       <div class="settings-body">
@@ -186,6 +186,7 @@ function onDragStart(e: MouseEvent) {
             :key="page.id"
             class="sidebar-item"
             :class="{ active: activePage === page.id }"
+            :aria-label="page.label"
             @click="activePage = page.id"
           >
             <span class="sidebar-icon">{{ page.icon }}</span>
@@ -206,7 +207,7 @@ function onDragStart(e: MouseEvent) {
                     {{ mode === 'ai' ? '🤖 AI 编码状态' : '🎵 媒体播放' }}
                   </span>
                   <span class="priority-badge">{{ idx === 0 ? '最高优先' : idx === localPriority.length - 1 ? '最低优先' : '' }}</span>
-                  <button v-if="idx > 0" class="move-btn" @click="togglePriority(mode)" title="提高优先级">↑</button>
+                  <button v-if="idx > 0" class="move-btn" @click="togglePriority(mode)" :aria-label="`提高 ${mode === 'ai' ? 'AI 编码状态' : '媒体播放'} 优先级`" title="提高优先级">↑</button>
                 </div>
               </div>
             </div>
@@ -242,15 +243,15 @@ function onDragStart(e: MouseEvent) {
               <h3>主题样式</h3>
               <p class="section-desc">切换界面配色方案</p>
               <div class="theme-grid">
-                <div class="theme-card" :class="{ active: localTheme === 'dark' }" @click="localTheme = 'dark'">
+                <div class="theme-card" :class="{ active: localTheme === 'dark' }" tabindex="0" role="radio" :aria-checked="localTheme === 'dark'" aria-label="深色主题" @click="localTheme = 'dark'" @keydown.enter="localTheme = 'dark'" @keydown.space.prevent="localTheme = 'dark'">
                   <div class="theme-preview theme-preview-dark"></div>
                   <span>深色</span>
                 </div>
-                <div class="theme-card" :class="{ active: localTheme === 'light' }" @click="localTheme = 'light'">
+                <div class="theme-card" :class="{ active: localTheme === 'light' }" tabindex="0" role="radio" :aria-checked="localTheme === 'light'" aria-label="浅色主题" @click="localTheme = 'light'" @keydown.enter="localTheme = 'light'" @keydown.space.prevent="localTheme = 'light'">
                   <div class="theme-preview theme-preview-light"></div>
                   <span>浅色</span>
                 </div>
-                <div class="theme-card" :class="{ active: localTheme === 'frosted' }" @click="localTheme = 'frosted'">
+                <div class="theme-card" :class="{ active: localTheme === 'frosted' }" tabindex="0" role="radio" :aria-checked="localTheme === 'frosted'" aria-label="磨砂主题" @click="localTheme = 'frosted'" @keydown.enter="localTheme = 'frosted'" @keydown.space.prevent="localTheme = 'frosted'">
                   <div class="theme-preview theme-preview-frosted"></div>
                   <span>磨砂</span>
                 </div>
@@ -341,10 +342,10 @@ function onDragStart(e: MouseEvent) {
                     Hooks 指向旧路径，建议重新注入以更新到当前路径
                   </div>
                   <div class="hook-actions">
-                    <button class="btn btn-small" @click="injectHook('claude')" :disabled="hooksLoading">
+                    <button class="btn btn-small" @click="injectHook('claude')" :disabled="hooksLoading" :aria-label="hooksStatus.claude.installed ? '重新注入 Claude Hook' : '注入 Claude Hook'">
                       {{ hooksStatus.claude.installed ? '重新注入' : '注入' }}
                     </button>
-                    <button v-if="hooksStatus.claude.installed" class="btn btn-small btn-danger" @click="removeHook('claude')" :disabled="hooksLoading">
+                    <button v-if="hooksStatus.claude.installed" class="btn btn-small btn-danger" @click="removeHook('claude')" :disabled="hooksLoading" aria-label="移除 Claude Hook">
                       移除
                     </button>
                   </div>
@@ -364,10 +365,10 @@ function onDragStart(e: MouseEvent) {
                     Hooks 指向旧路径，建议重新注入以更新到当前路径
                   </div>
                   <div class="hook-actions">
-                    <button class="btn btn-small" @click="injectHook('reasonix')" :disabled="hooksLoading">
+                    <button class="btn btn-small" @click="injectHook('reasonix')" :disabled="hooksLoading" :aria-label="hooksStatus.reasonix.installed ? '重新注入 Reasonix Hook' : '注入 Reasonix Hook'">
                       {{ hooksStatus.reasonix.installed ? '重新注入' : '注入' }}
                     </button>
-                    <button v-if="hooksStatus.reasonix.installed" class="btn btn-small btn-danger" @click="removeHook('reasonix')" :disabled="hooksLoading">
+                    <button v-if="hooksStatus.reasonix.installed" class="btn btn-small btn-danger" @click="removeHook('reasonix')" :disabled="hooksLoading" aria-label="移除 Reasonix Hook">
                       移除
                     </button>
                   </div>
@@ -375,7 +376,7 @@ function onDragStart(e: MouseEvent) {
               </div>
 
               <div class="hooks-batch">
-                <button class="btn btn-primary" @click="injectAllHooks" :disabled="hooksLoading">
+                <button class="btn btn-primary" @click="injectAllHooks" :disabled="hooksLoading" aria-label="全部注入 Hooks">
                   全部注入
                 </button>
               </div>
@@ -396,6 +397,9 @@ function onDragStart(e: MouseEvent) {
         </button>
       </div>
     </div>
+  </div>
+  <div aria-live="polite" aria-atomic="true" class="sr-only">
+    {{ savedFeedback ? '设置已保存' : '' }}
   </div>
 </template>
 
@@ -568,7 +572,7 @@ function onDragStart(e: MouseEvent) {
 }
 
 .priority-badge {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--timo-gray);
 }
 
@@ -706,7 +710,7 @@ function onDragStart(e: MouseEvent) {
 }
 
 .toggle-desc {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-gray);
   width: 100%;
   margin-top: 4px;
@@ -788,7 +792,7 @@ function onDragStart(e: MouseEvent) {
 }
 
 .hook-path {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-gray);
   font-family: monospace;
   background: var(--timo-badge-bg);
@@ -877,5 +881,26 @@ function onDragStart(e: MouseEvent) {
 
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.3);
+}
+
+.close-btn:focus-visible,
+.btn:focus-visible,
+.sidebar-item:focus-visible,
+.theme-card:focus-visible,
+.move-btn:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </style>

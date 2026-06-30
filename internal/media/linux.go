@@ -14,12 +14,17 @@ const (
 	mprisPrefix      = "org.mpris.MediaPlayer2."
 	mprisObject      = "/org/mpris/MediaPlayer2"
 	mprisPlayerIface = "org.mpris.MediaPlayer2.Player"
+	propertiesIface  = "org.freedesktop.DBus.Properties"
 )
 
 // LinuxProvider implements MediaProvider using MPRIS over D-Bus.
 type LinuxProvider struct {
-	conn       *dbus.Conn
-	lastPlayer string
+	conn         *dbus.Conn
+	lastPlayer   string
+
+	// Signal subscription
+	signalChan chan struct{}
+	signalStop chan struct{}
 }
 
 // NewLinuxProvider connects to the session bus.
@@ -269,7 +274,92 @@ func (p *LinuxProvider) GetCapabilities() (*MediaCapabilities, error) {
 	return cap, nil
 }
 
+// ── D-Bus PropertiesChanged signal subscription ──
+
+// SubscribeSignals subscribes to MPRIS PropertiesChanged signals.
+// Returns a channel that fires (unblocks) each time a relevant signal arrives.
+// The caller should read from this channel and call GetState() to fetch the
+// latest state, ensuring the polling loop has up-to-date data instantly.
+func (p *LinuxProvider) SubscribeSignals() (<-chan struct{}, error) {
+	if p.signalChan != nil {
+		return p.signalChan, nil
+	}
+
+	p.signalChan = make(chan struct{}, 16)
+	p.signalStop = make(chan struct{})
+
+	// Match rule: listen for PropertiesChanged on the MPRIS Player interface
+	// from any MPRIS player bus name.
+	matchRule := fmt.Sprintf(
+		"type='signal',interface='%s',path='%s'",
+		propertiesIface, mprisObject,
+	)
+	busObj := p.conn.BusObject()
+	if err := busObj.Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
+		return nil, fmt.Errorf("failed to add D-Bus match: %w", err)
+	}
+
+	// Register to receive all signals
+	signalCh := make(chan *dbus.Signal, 16)
+	p.conn.Signal(signalCh)
+
+	go func() {
+		defer func() {
+			p.conn.RemoveSignal(signalCh)
+			// Try to remove the match (best-effort)
+			_ = busObj.Call("org.freedesktop.DBus.RemoveMatch", 0, matchRule).Err
+		}()
+
+		for {
+			select {
+			case sig := <-signalCh:
+				if sig == nil {
+					continue
+				}
+				// We only care about PropertiesChanged on the MPRIS player interface
+				if sig.Name != propertiesIface+".PropertiesChanged" {
+					continue
+				}
+				// Signal body: [iface_name (string), changed_properties (map), invalidated ([]string)]
+				if len(sig.Body) < 1 {
+					continue
+				}
+				ifaceName, ok := sig.Body[0].(string)
+				if !ok || ifaceName != mprisPlayerIface {
+					continue
+				}
+				// Notify the channel (non-blocking, drop if full)
+				select {
+				case p.signalChan <- struct{}{}:
+				default:
+				}
+
+			case <-p.signalStop:
+				return
+			}
+		}
+	}()
+
+	log.Printf("timo: subscribed to MPRIS PropertiesChanged signals on %s", mprisObject)
+	return p.signalChan, nil
+}
+
+// UnsubscribeSignals stops the signal listener goroutine and removes D-Bus match.
+func (p *LinuxProvider) UnsubscribeSignals() {
+	if p.signalStop == nil {
+		return
+	}
+	select {
+	case <-p.signalStop:
+		// already closed
+	default:
+		close(p.signalStop)
+	}
+	p.signalChan = nil
+}
+
 func (p *LinuxProvider) Close() {
+	p.UnsubscribeSignals()
 	if p.conn != nil {
 		p.conn.Close()
 	}

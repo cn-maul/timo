@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { MediaInfo } from '../types/media'
-import { Play, Pause } from '../../bindings/timo/mediaservice'
+import { Play, Pause, Next } from '../../bindings/timo/internal/app/mediaservice'
 
 export function formatTime(ms: number): string {
   if (ms <= 0) return '0:00'
@@ -25,6 +25,16 @@ export const useMediaStore = defineStore('media', () => {
   const playing = ref(false)
   const hasMedia = ref(false)
 
+  const safeCoverUrl = computed(() => {
+    const url = coverUrl.value
+    if (!url) return ''
+    if (url.startsWith('file://')) return ''
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image/')) {
+      return url
+    }
+    return ''
+  })
+
   const progressPercent = computed(() => {
     if (durationMs.value <= 0) return 0
     return Math.min(100, (positionMs.value / durationMs.value) * 100)
@@ -38,6 +48,14 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
+  async function nextTrack() {
+    try {
+      await Next()
+    } catch (err) {
+      console.error('nextTrack failed:', err)
+    }
+  }
+
   function update(info: MediaInfo) {
     title.value = info.title
     artist.value = info.artist
@@ -46,7 +64,7 @@ export const useMediaStore = defineStore('media', () => {
     durationMs.value = info.durationMs
     positionMs.value = info.positionMs
     playing.value = info.playing
-    hasMedia.value = info.playing && !!(info.title || info.artist)
+    hasMedia.value = !!(info.title || info.artist)
   }
 
   function clear() {
@@ -61,9 +79,9 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   return {
-    title, artist, album, coverUrl,
+    title, artist, album, coverUrl, safeCoverUrl,
     durationMs, positionMs, playing, hasMedia,
     progressPercent,
-    togglePlay, update, clear,
+    togglePlay, nextTrack, update, clear,
   }
 })

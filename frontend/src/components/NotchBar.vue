@@ -5,12 +5,17 @@ import { useNotificationStore } from '../stores/notification'
 import { useSystemStore } from '../stores/system'
 import { useSettingsStore } from '../stores/settings'
 import { useActiveMode } from '../composables/useActiveMode'
+import { Next } from '../../bindings/timo/internal/app/mediaservice'
 import WaveformBars from './WaveformBars.vue'
 
 const media = useMediaStore()
 const notif = useNotificationStore()
 const sys = useSystemStore()
 const settings = useSettingsStore()
+
+async function doNext() {
+  try { await Next() } catch (e) { console.error('Next failed:', e) }
+}
 
 // Priority-aware active mode
 const activeMode = useActiveMode(
@@ -134,10 +139,23 @@ const showToolCount = computed(() => settings.showToolProgress && notif.state ==
 const emit = defineEmits<{
   toggle: []
 }>()
+
+const props = defineProps<{
+  expanded?: boolean
+}>()
 </script>
 
 <template>
-  <div class="notch-bar" @click="emit('toggle')">
+  <div
+    class="notch-bar"
+    tabindex="0"
+    role="button"
+    aria-label="展开控制面板"
+    :aria-expanded="expanded"
+    @click="emit('toggle')"
+    @keydown.enter="emit('toggle')"
+    @keydown.space.prevent="emit('toggle')"
+  >
     <!-- AI mode -->
     <template v-if="activeMode === 'ai'">
       <div class="notch-content">
@@ -182,16 +200,22 @@ const emit = defineEmits<{
           />
         </div>
       </div>
-      <div class="notch-progress" v-if="notif.state === 'running'">
+      <div
+        class="notch-progress"
+        role="progressbar"
+        aria-label="AI 工作进度"
+        :aria-valuenow="progressPercent"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
         <div class="notch-progress-fill claude-progress" :style="{ width: progressPercent + '%' }" />
       </div>
     </template>
-
-    <!-- Media mode -->
     <template v-else-if="activeMode === 'media'">
       <div class="notch-content">
         <div class="notch-left">
-          <img v-if="media.coverUrl" :src="media.coverUrl" class="notch-cover" alt="" />
+          <img src="/minimax-color.png" class="notch-media-logo" alt="" />
+          <img v-if="media.safeCoverUrl" :src="media.safeCoverUrl" class="notch-cover" alt="" />
           <div class="notch-title-wrap">
             <span class="notch-title" :class="{ scrolling: needsScrolling }">
               {{ titleText }}
@@ -201,13 +225,39 @@ const emit = defineEmits<{
         </div>
         <div class="notch-right">
           <span class="media-remaining" v-if="remainingText">{{ remainingText }}</span>
-          <span class="notch-play-icon" @click.stop="media.togglePlay">
-            {{ media.playing ? '❚❚' : '▶' }}
+          <span
+            class="notch-play-icon"
+            tabindex="0"
+            role="button"
+            aria-label="切换播放/暂停"
+            @click.stop="media.togglePlay"
+            @keydown.enter="media.togglePlay"
+            @keydown.space.prevent="media.togglePlay"
+          >
+            <span class="icon-fix" :class="{ 'icon-play': !media.playing }">{{ media.playing ? '❚❚' : '▶' }}</span>
+          </span>
+          <span
+            class="notch-play-icon"
+            tabindex="0"
+            role="button"
+            aria-label="下一首"
+            @click.stop="doNext"
+            @keydown.enter="doNext"
+            @keydown.space.prevent="doNext"
+          >
+            <span class="icon-fix">⏭</span>
           </span>
           <WaveformBars :playing="media.playing" />
         </div>
       </div>
-      <div class="notch-progress">
+      <div
+        class="notch-progress"
+        role="progressbar"
+        :aria-valuenow="media.progressPercent"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-label="`媒体播放进度 ${Math.round(media.progressPercent)}%`"
+      >
         <div class="notch-progress-fill" :style="{ width: media.progressPercent + '%' }" />
       </div>
     </template>
@@ -247,4 +297,33 @@ const emit = defineEmits<{
 
     <!-- none mode: show nothing (v-else covers activeMode === 'none') -->
   </div>
+  <div aria-live="polite" aria-atomic="true" class="sr-only">
+    {{ notif.state === 'running' ? `AI 运行中，已调用 ${notif.toolCount} 个工具` : notif.state === 'attention' ? 'AI 需要关注' : notif.state === 'done' ? 'AI 任务完成' : '' }}
+  </div>
 </template>
+
+<style scoped>
+.notch-bar:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.notch-play-icon:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+</style>

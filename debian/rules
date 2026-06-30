@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+export DH_GOPKG = github.com/yourrepo/timo
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Build the frontend
+	cd frontend && npm install && npm run build
+	# Build the Go binary
+	CGO_ENABLED=1 go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/timo .
+
+override_dh_auto_install:
+	# Install binary
+	install -Dm755 bin/timo debian/timo/usr/bin/timo
+	# Install desktop entry
+	install -Dm644 debian/timo.desktop debian/timo/usr/share/applications/timo.desktop
+	# Install icon
+	install -Dm644 logo.png debian/timo/usr/share/pixmaps/timo.png
+
+override_dh_auto_clean:
+	rm -rf bin/ frontend/dist/ frontend/node_modules/

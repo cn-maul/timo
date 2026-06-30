@@ -9,12 +9,15 @@ import (
 type Emitter func(info *MediaInfo)
 
 // Poller periodically fetches media state and emits it to the frontend.
+// It also supports an optional signal source (e.g. D-Bus PropertiesChanged)
+// for instant updates when media state changes.
 type Poller struct {
-	provider MediaProvider
-	emitter  Emitter
-	interval time.Duration
-	stop     chan struct{}
-	lastInfo *MediaInfo
+	provider   MediaProvider
+	emitter    Emitter
+	interval   time.Duration
+	stop       chan struct{}
+	lastInfo   *MediaInfo
+	signalChan <-chan struct{}
 
 	// Guard against double-Start and safe multi-Stop
 	mu       sync.Mutex
@@ -31,6 +34,16 @@ func NewPoller(provider MediaProvider, emitter Emitter, interval time.Duration) 
 		stop:     make(chan struct{}),
 		lastInfo: &MediaInfo{},
 	}
+}
+
+// SetSignalSource attaches an optional signal channel. When the channel fires,
+// the poller immediately fetches and emits the latest state, bypassing the
+// polling interval. This allows instant response to D-Bus PropertiesChanged
+// signals while still having the polling loop as a fallback.
+//
+// Must be called before Start().
+func (p *Poller) SetSignalSource(ch <-chan struct{}) {
+	p.signalChan = ch
 }
 
 // Start begins the polling loop in a goroutine. It is a no-op if already running.
@@ -54,6 +67,9 @@ func (p *Poller) Start() {
 		for {
 			select {
 			case <-ticker.C:
+				p.fetchAndEmit()
+			case <-p.signalChan:
+				// Signal received (e.g. D-Bus PropertiesChanged) — fetch immediately
 				p.fetchAndEmit()
 			case <-p.stop:
 				return
@@ -101,7 +117,11 @@ func (p *Poller) hasChanged(info *MediaInfo) bool {
 		return true
 	}
 	diff := info.PositionMs - p.lastInfo.PositionMs
-	return diff < -1000 || diff > 2000
+	// Emit if position jumped backward (e.g. track restart) or
+	// advanced >500ms. With a 1s polling interval, normal playback
+	// advances ~1000ms, so 500 reliably triggers updates without
+	// causing excessive re-renders for very small movements.
+	return diff < -1000 || diff > 500
 }
 
 // GetProvider returns the underlying MediaProvider.

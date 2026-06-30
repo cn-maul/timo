@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useMediaStore, formatTime } from '../stores/media'
 import { useNotificationStore } from '../stores/notification'
 import { useSettingsStore } from '../stores/settings'
-import { Next, Previous } from '../../bindings/timo/mediaservice'
+import { Next, Previous } from '../../bindings/timo/internal/app/mediaservice'
 
 const store = useMediaStore()
 const notif = useNotificationStore()
@@ -117,8 +117,8 @@ function formatDuration(ms: number): string {
     <template v-else-if="showMediaPanel">
       <div class="panel-top">
         <img
-          v-if="store.coverUrl"
-          :src="store.coverUrl"
+          v-if="store.safeCoverUrl"
+          :src="store.safeCoverUrl"
           class="panel-cover"
           alt="Album cover"
         />
@@ -130,7 +130,14 @@ function formatDuration(ms: number): string {
       </div>
 
       <div class="progress-container">
-        <div class="progress-bar-bg">
+        <div
+          class="progress-bar-bg"
+          role="progressbar"
+          :aria-valuenow="store.progressPercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-label="`播放进度 ${Math.round(store.progressPercent)}%`"
+        >
           <div
             class="progress-bar-fill"
             :style="{ width: store.progressPercent + '%' }"
@@ -143,13 +150,16 @@ function formatDuration(ms: number): string {
       </div>
 
       <div class="controls">
-        <button class="control-btn" aria-label="Previous" @click="doPrev">⏮</button>
-        <button class="control-btn play-pause" aria-label="Play/Pause" @click="store.togglePlay">
+        <button class="control-btn" aria-label="上一首" @click="doPrev">⏮</button>
+        <button class="control-btn play-pause" aria-label="播放/暂停" @click="store.togglePlay">
           {{ store.playing ? '❚❚' : '▶' }}
         </button>
-        <button class="control-btn" aria-label="Next" @click="doNext">⏭</button>
+        <button class="control-btn" aria-label="下一首" @click="doNext">⏭</button>
       </div>
     </template>
+  </div>
+  <div aria-live="polite" aria-atomic="true" class="sr-only">
+    {{ store.playing ? '正在播放' : '已暂停' }}
   </div>
 </template>
 
@@ -259,13 +269,13 @@ function formatDuration(ms: number): string {
 }
 
 .current-tool .tool-duration {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-gray);
   font-family: monospace;
 }
 
 .current-context {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-text-secondary);
   margin-top: 4px;
   white-space: nowrap;
@@ -297,7 +307,7 @@ function formatDuration(ms: number): string {
 }
 
 .subagent-desc {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-text-secondary);
   margin-top: 4px;
 }
@@ -308,7 +318,7 @@ function formatDuration(ms: number): string {
 }
 
 .subagent-result {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-text-secondary);
   margin-top: 6px;
   padding-top: 6px;
@@ -330,7 +340,7 @@ function formatDuration(ms: number): string {
 }
 
 .history-title {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--timo-gray);
   margin-bottom: 6px;
   text-transform: uppercase;
@@ -413,5 +423,22 @@ function formatDuration(ms: number): string {
 .attention-message {
   font-size: 13px;
   color: var(--timo-text);
+}
+
+.control-btn:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </style>

@@ -21,7 +21,7 @@ onMounted(() => {
 
 // Listen for settings-updated in BOTH windows and apply theme locally.
 // Each Wails window has its own DOM, so each needs to set data-theme independently.
-Events.On('settings-updated', (event: { data: { theme?: string } }) => {
+Events.On('settings-updated', (event: { data: { theme?: string } | null }) => {
   if (event.data && event.data.theme) {
     document.documentElement.setAttribute('data-theme', event.data.theme)
   }

@@ -1,6 +1,6 @@
 //go:build windows
 
-package main
+package app
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shirou/gopsutil/v4/process"
+	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 )
 

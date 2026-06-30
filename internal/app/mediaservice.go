@@ -1,8 +1,8 @@
-package main
+package app
 
 import (
 	"errors"
-	"timo/media"
+	"timo/internal/media"
 )
 
 var errMediaServiceUnavailable = errors.New("media service unavailable: provider not initialized")

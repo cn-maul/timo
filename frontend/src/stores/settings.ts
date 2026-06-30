@@ -3,9 +3,9 @@ import { ref, watch } from 'vue'
 import { Events } from '@wailsio/runtime'
 
 export interface TimoSettings {
-  displayPriority: string[]
-  idleDisplay: 'all' | 'cpu' | 'mem' | 'net' | 'none'
-  theme: 'dark' | 'light' | 'frosted'
+  displayPriority: string[] | null
+  idleDisplay: string
+  theme: string
   showToolContext: boolean
   showToolProgress: boolean
   showSubagentDetails: boolean
@@ -59,7 +59,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // Listen for settings-loaded response from backend
   Events.On('settings-loaded', (event: { data: TimoSettings }) => {
     if (!event.data) return
-    displayPriority.value = event.data.displayPriority || defaultSettings().displayPriority
+    displayPriority.value = (event.data.displayPriority ?? defaultSettings().displayPriority) as string[]
     idleDisplay.value = (event.data.idleDisplay as any) || defaultSettings().idleDisplay
     theme.value = (event.data.theme as any) || defaultSettings().theme
     // New fields with defaults
@@ -71,9 +71,9 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   // Listen for settings-updated broadcast (from tray or other sources)
-  Events.On('settings-updated', (event: { data: TimoSettings }) => {
+  Events.On('settings-updated', (event: { data: TimoSettings | null }) => {
     if (!event.data) return
-    displayPriority.value = event.data.displayPriority || defaultSettings().displayPriority
+    displayPriority.value = (event.data.displayPriority ?? defaultSettings().displayPriority) as string[]
     idleDisplay.value = (event.data.idleDisplay as any) || defaultSettings().idleDisplay
     theme.value = (event.data.theme as any) || defaultSettings().theme
     showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true

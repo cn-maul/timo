@@ -1,6 +1,6 @@
 //go:build linux
 
-package main
+package app
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // GlobalHotkeyManager manages system-wide hotkeys that work even when
@@ -145,4 +146,31 @@ func (m *GlobalHotkeyManager) logStatus() {
 			}
 			return "; global grab unavailable (Wayland)"
 		}())
+}
+
+// setupAppHotkeys registers Wails app-level keybindings that work when
+// the Timo window has focus. For system-wide hotkeys, the GlobalHotkeyManager
+// handles registration via D-Bus/X11.
+func setupAppHotkeys(wailsApp *application.App, settings *TimoSettings, hkm *GlobalHotkeyManager) {
+	if settings == nil || !settings.Hotkeys.Enabled {
+		return
+	}
+
+	// Toggle window
+	if settings.Hotkeys.ToggleWindow != "" {
+		wailsApp.KeyBinding.Add(settings.Hotkeys.ToggleWindow, func(w application.Window) {
+			if hkm != nil {
+				hkm.Trigger(settings.Hotkeys.ToggleWindow)
+			}
+		})
+	}
+
+	// Toggle media
+	if settings.Hotkeys.ToggleMedia != "" {
+		wailsApp.KeyBinding.Add(settings.Hotkeys.ToggleMedia, func(w application.Window) {
+			if hkm != nil {
+				hkm.Trigger(settings.Hotkeys.ToggleMedia)
+			}
+		})
+	}
 }

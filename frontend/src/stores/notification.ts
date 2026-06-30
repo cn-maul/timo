@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { Notification } from '../../bindings/timo/models'
+import { Notification } from '../../bindings/timo/internal/app/models'
 
 const DONE_CLEAR_DELAY = 5000
 const ATTENTION_CLEAR_DELAY = 8000
@@ -66,7 +66,7 @@ function summarizeCommand(cmd: string): string {
 }
 
 // Extract display info from tool input
-function getToolDisplayInfo(tool: string, toolInput: Record<string, unknown> | undefined): { target: string; context: string } {
+function getToolDisplayInfo(tool: string, toolInput: Record<string, any> | undefined | null): { target: string; context: string } {
   if (!toolInput) return { target: '', context: '' }
 
   switch (tool) {
@@ -115,8 +115,8 @@ export const useNotificationStore = defineStore('notification', () => {
   const elapsed = ref(0)
 
   // Extended fields
-  const toolInput = ref<Record<string, unknown> | undefined>()
-  const toolOutput = ref<Record<string, unknown> | undefined>()
+  const toolInput = ref<Record<string, any> | undefined | null>()
+  const toolOutput = ref<Record<string, any> | undefined | null>()
   const durationMs = ref(0)
   const agentType = ref('')
   const agentDesc = ref('')

@@ -1,10 +1,13 @@
 //go:build windows
 
-package main
+package app
 
 import (
 	"log"
 	"net"
+	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -201,15 +204,34 @@ func (p *SystemPoller) readDiskSpeed() (readKBps, writeKBps float64) {
 	return readKBps, writeKBps
 }
 
-// readGPU returns GPU usage and temperature on Windows.
-// TODO: Implement using Windows Performance Counters or NVML/ADLX.
+// readGPU returns GPU usage and temperature on Windows via nvidia-smi.
 func (p *SystemPoller) readGPU() (usage, temp float64) {
-	// GPU monitoring on Windows requires additional setup:
-	// - NVIDIA: NVML SDK or nvidia-smi
-	// - AMD: ADLX SDK
-	// - Intel: OneAPI Level Zero
-	// For now, return 0 to indicate unavailability.
-	return 0, 0
+	cmd := exec.Command("nvidia-smi",
+		"--query-gpu=utilization.gpu,temperature.gpu",
+		"--format=csv,noheader,nounits",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, 0
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 {
+		return 0, 0
+	}
+
+	fields := strings.Split(lines[0], ",")
+	if len(fields) < 2 {
+		return 0, 0
+	}
+
+	u, err1 := strconv.ParseFloat(strings.TrimSpace(fields[0]), 64)
+	t, err2 := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64)
+	if err1 != nil || err2 != nil {
+		return 0, 0
+	}
+
+	return u, t
 }
 
 // getLocalIP returns the primary non-loopback IPv4 address.

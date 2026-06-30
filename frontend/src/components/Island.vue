@@ -49,11 +49,19 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="island-container">
-    <NotchBar @toggle="toggle" />
+  <div
+    class="island-container"
+    role="region"
+    aria-label="Timo 状态面板"
+    :aria-expanded="expanded"
+  >
+    <NotchBar :expanded="expanded" @toggle="toggle" />
     <Transition name="panel">
       <DropPanel v-if="expanded" @mouseenter="resetTimer" />
     </Transition>
+    <div aria-live="polite" aria-atomic="true" class="sr-only">
+      {{ expanded ? '面板已展开' : '面板已收起' }}
+    </div>
   </div>
 </template>
 
@@ -63,5 +71,23 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.island-container:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 </style>
