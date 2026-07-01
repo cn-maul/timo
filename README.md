@@ -315,6 +315,8 @@ Timo 采用 **Go 后端 + Vue 前端** 的 Wails 应用架构：
 
 > **关于 macOS**：Timo 基于 Wails v3 构建，但 macOS 平台尚未实现全局热键、系统监控和 Dock 窗口等核心功能。如果希望支持 macOS，欢迎提交 PR。注意 `build/darwin/` 和 `build/ios/` 目录已移除。
 
+> **关于 Linux 透明窗口**：由于 WebKitGTK 的底层限制，Linux 上的透明窗口在胶囊形状外围会显示轻微的灰色边框。这是因为 WebKitGTK 的 webview 容器本身有一个默认的背景色，无法通过 CSS 或 Wails 配置完全消除。这在 macOS 和 Windows 上不会出现。该问题已在 Wails v3 的 [PR #4722](https://github.com/wailsapp/wails/pull/4722) 中部分修复（背景色 alpha 值不再被强制设为 255），但 webview 容器的灰色背景仍无法完全去除。这是 WebKitGTK 架构层面的限制。
+
 ---
 
 ## License
