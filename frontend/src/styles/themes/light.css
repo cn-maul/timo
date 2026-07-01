@@ -2,45 +2,65 @@
 /* Applied via data-theme="light" on <html> */
 
 [data-theme="light"] {
+  /* Light theme with Spotify-inspired proportions */
   --timo-bg: #f0f0f0;
-  --timo-text: #222;
-  --timo-text-secondary: #666;
+  --timo-bg-darker: #e0e0e0;
   --timo-surface: #ffffff;
   --timo-surface-hover: #e8e8e8;
-  --timo-border: #ccc;
+  --timo-surface-elevated: #f5f5f5;
+
+  /* Text colors */
+  --timo-text: #222222;
+  --timo-text-secondary: #666666;
+  --timo-text-near-white: #888888;
+
+  /* Semantic colors - adjusted for light background */
   --timo-green: #16a34a;
-  --timo-yellow: #ca8a04;
+  --timo-green-border: #15803d;
   --timo-red: #dc2626;
-  --timo-gray: #999;
+  --timo-yellow: #ca8a04;
+  --timo-blue: #2563eb;
+
+  /* Surface & Border */
+  --timo-border: #cccccc;
+  --timo-border-light: #999999;
+  --timo-separator: #bbbbbb;
+  --timo-gray: #999999;
 
   /* Extended variables */
   --timo-remaining-color: #888;
-  --timo-progress-bg: rgba(0, 0, 0, 0.08);
-  --timo-progress-fill: rgba(0, 0, 0, 0.4);
-  --timo-play-bg: rgba(0, 0, 0, 0.06);
-  --timo-play-hover: rgba(0, 0, 0, 0.12);
+  --timo-progress-bg: rgba(0, 0, 0, 0.10);
+  --timo-progress-fill: rgba(0, 0, 0, 0.50);
+  --timo-play-bg: rgba(0, 0, 0, 0.08);
+  --timo-play-hover: rgba(0, 0, 0, 0.15);
   --timo-dir-color: #888;
   --timo-tool-color: #999;
   --timo-glow-green: rgba(22, 163, 74, 0.3);
   --timo-glow-yellow: rgba(202, 138, 4, 0.3);
   --timo-glow-red: rgba(220, 38, 38, 0.3);
-  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --timo-overlay-bg: rgba(0, 0, 0, 0.3);
+
+  /* Shadows for light theme */
+  --timo-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --timo-shadow-medium: 0 8px 8px rgba(0, 0, 0, 0.08);
+  --timo-shadow-inset: rgb(240,240,240) 0px 1px 0px, rgb(200,200,200) 0px 0px 0px 1px inset;
+
+  /* Overlay */
+  --timo-overlay-bg: rgba(0, 0, 0, 0.40);
   --timo-backdrop-filter: none;
 
-  /* Light-mode button & card backgrounds (dark-tinted on white surface) */
+  /* Approval buttons for light theme */
+  --timo-approve-yes-bg: rgba(22, 163, 74, 0.15);
+  --timo-approve-yes-hover: rgba(22, 163, 74, 0.30);
+  --timo-approve-no-bg: rgba(220, 38, 38, 0.15);
+  --timo-approve-no-hover: rgba(220, 38, 38, 0.30);
+
+  /* Button & card backgrounds for light theme */
   --timo-btn-bg: rgba(0, 0, 0, 0.08);
-  --timo-btn-hover: rgba(0, 0, 0, 0.12);
+  --timo-btn-hover: rgba(0, 0, 0, 0.14);
   --timo-card-bg: rgba(0, 0, 0, 0.04);
-  --timo-card-hover: rgba(0, 0, 0, 0.06);
+  --timo-card-hover: rgba(0, 0, 0, 0.08);
   --timo-list-item-bg: rgba(0, 0, 0, 0.03);
   --timo-list-item-hover: rgba(0, 0, 0, 0.06);
-  --timo-list-item-active: rgba(0, 0, 0, 0.1);
+  --timo-list-item-active: rgba(0, 0, 0, 0.10);
   --timo-badge-bg: rgba(0, 0, 0, 0.08);
-
-  /* Approval button backgrounds — higher opacity for light surface contrast */
-  --timo-approve-yes-bg: rgba(22, 163, 74, 0.25);
-  --timo-approve-yes-hover: rgba(22, 163, 74, 0.4);
-  --timo-approve-no-bg: rgba(220, 38, 38, 0.25);
-  --timo-approve-no-hover: rgba(220, 38, 38, 0.4);
 }

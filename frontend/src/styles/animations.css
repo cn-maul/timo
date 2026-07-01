@@ -1,4 +1,4 @@
-/* Waveform bars animation */
+/* Waveform bars animation - Spotify-inspired */
 .waveform {
   display: flex;
   align-items: flex-end;
@@ -27,7 +27,7 @@
   100% { height: 30px; }
 }
 
-/* Panel expand/collapse transitions */
+/* Panel expand/collapse transitions - Spotify-inspired smooth easing */
 .panel-enter-active {
   animation: panel-slide-down 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }

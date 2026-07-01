@@ -1,29 +1,58 @@
+/* Timo — Spotify-inspired global styles */
+/* Based on DESIGN-spotify.md design system */
+
 :root {
-  --timo-bg: #000;
+  /* Default dark theme colors (Spotify-inspired) */
+  --timo-bg: #121212;
+  --timo-bg-darker: #0a0a0a;
   --timo-text: #ffffff;
-  --timo-text-secondary: #b0b0b0;
-  --timo-surface: #1a1a1a;
-  --timo-surface-hover: #333;
-  --timo-border: #555;
-  --timo-green: #22c55e;
-  --timo-yellow: #eab308;
-  --timo-red: #ef4444;
-  --timo-gray: #888;
+  --timo-text-secondary: #b3b3b3;
+  --timo-text-near-white: #cbcbcb;
+  --timo-surface: #181818;
+  --timo-surface-hover: #1f1f1f;
+  --timo-surface-elevated: #252525;
+  --timo-border: #4d4d4d;
+  --timo-border-light: #7c7c7c;
+  --timo-separator: #b3b3b3;
+  --timo-green: #1ed760;
+  --timo-green-border: #1db954;
+  --timo-red: #f3727f;
+  --timo-yellow: #ffa42b;
+  --timo-blue: #539df5;
+  --timo-gray: #888888;
 
   /* Extended variables for themes */
   --timo-remaining-color: #aaa;
-  --timo-progress-bg: rgba(255, 255, 255, 0.1);
-  --timo-progress-fill: rgba(255, 255, 255, 0.6);
-  --timo-play-bg: rgba(255, 255, 255, 0.12);
-  --timo-play-hover: rgba(255, 255, 255, 0.25);
+  --timo-progress-bg: rgba(255, 255, 255, 0.15);
+  --timo-progress-fill: rgba(255, 255, 255, 0.7);
+  --timo-play-bg: rgba(255, 255, 255, 0.15);
+  --timo-play-hover: rgba(255, 255, 255, 0.30);
   --timo-dir-color: #707070;
   --timo-tool-color: #999;
-  --timo-glow-green: rgba(34, 197, 94, 0.4);
-  --timo-glow-yellow: rgba(234, 179, 8, 0.4);
-  --timo-glow-red: rgba(239, 68, 68, 0.4);
-  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --timo-overlay-bg: rgba(0, 0, 0, 0.5);
+  --timo-glow-green: rgba(30, 215, 96, 0.4);
+  --timo-glow-yellow: rgba(255, 164, 43, 0.4);
+  --timo-glow-red: rgba(243, 114, 127, 0.4);
+  --timo-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --timo-shadow-medium: 0 8px 8px rgba(0, 0, 0, 0.3);
+  --timo-shadow-inset: rgb(18,18,18) 0px 1px 0px, rgb(124,124,124) 0px 0px 0px 1px inset;
+  --timo-overlay-bg: rgba(0, 0, 0, 0.75);
   --timo-backdrop-filter: none;
+
+  /* Button & card backgrounds */
+  --timo-btn-bg: rgba(255, 255, 255, 0.08);
+  --timo-btn-hover: rgba(255, 255, 255, 0.14);
+  --timo-card-bg: rgba(255, 255, 255, 0.05);
+  --timo-card-hover: rgba(255, 255, 255, 0.08);
+  --timo-list-item-bg: rgba(255, 255, 255, 0.04);
+  --timo-list-item-hover: rgba(255, 255, 255, 0.08);
+  --timo-list-item-active: rgba(255, 255, 255, 0.12);
+  --timo-badge-bg: rgba(255, 255, 255, 0.10);
+
+  /* Approval buttons */
+  --timo-approve-yes-bg: rgba(30, 215, 96, 0.15);
+  --timo-approve-yes-hover: rgba(30, 215, 96, 0.30);
+  --timo-approve-no-bg: rgba(243, 114, 127, 0.15);
+  --timo-approve-no-hover: rgba(243, 114, 127, 0.30);
 }
 
 html, body {
@@ -31,8 +60,12 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* SpotifyMixUI font family with extensive fallback stack */
+  font-family: "SpotifyMixUI", "CircularSp-Arab", "CircularSp-Hebr", "CircularSp-Cyrl", "CircularSp-Grek", "CircularSp-Deva", "Helvetica Neue", Helvetica, Arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", "MS Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
+  /* Spotify-inspired compact text rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
@@ -41,22 +74,383 @@ html, body {
   background: var(--timo-bg);
 }
 
-/* ── Notch pill ── */
+/* ── Typography Scale (Spotify-inspired: 10px–24px compact range) ── */
+
+/* Section Title - 24px bold */
+.text-section-title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: normal;
+}
+
+/* Feature Heading - 18px semibold */
+.text-feature-heading {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.30;
+}
+
+/* Body Bold - 16px bold */
+.text-body-bold {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Body - 16px regular */
+.text-body {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* Button Uppercase - 14px with wide letter-spacing */
+.text-button-uppercase {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.00;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+/* Button - 14px bold */
+.text-button {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.14px;
+}
+
+/* Nav Link Bold - 14px bold */
+.text-nav-bold {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Nav Link - 14px regular */
+.text-nav {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Caption Bold - 14px bold */
+.text-caption-bold {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.50;
+}
+
+/* Caption - 14px regular */
+.text-caption {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Small Bold - 12px bold */
+.text-small-bold {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.50;
+}
+
+/* Small - 12px regular */
+.text-small {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Badge - 10.5px semibold */
+.text-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.33;
+  text-transform: capitalize;
+}
+
+/* Micro - 10px regular */
+.text-micro {
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* ── Spotify Pill & Circle Geometry ── */
+
+/* Full Pill Button (9999px radius) */
+.pill-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--timo-surface-hover);
+  color: var(--timo-text);
+  border: none;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.pill-button:hover {
+  background: var(--timo-btn-hover);
+}
+
+.pill-button:active {
+  transform: scale(0.97);
+}
+
+/* Large Pill Button (500px radius) */
+.pill-button-large {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0px 43px;
+  background: var(--timo-surface);
+  color: var(--timo-text);
+  border: none;
+  border-radius: 500px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.pill-button-large:hover {
+  background: var(--timo-surface-hover);
+}
+
+.pill-button-large:active {
+  transform: scale(0.97);
+}
+
+/* Light Pill Button */
+.pill-button-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #eeeeee;
+  color: #181818;
+  border: none;
+  border-radius: 500px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.pill-button-light:hover {
+  background: #dddddd;
+}
+
+/* Outlined Pill Button */
+.pill-button-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 16px 4px 36px;
+  background: transparent;
+  color: var(--timo-text);
+  border: 1px solid var(--timo-border-light);
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.pill-button-outlined:hover {
+  background: var(--timo-btn-bg);
+  border-color: var(--timo-text);
+}
+
+/* Circular Play Button (50% radius) */
+.circular-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  padding: 12px;
+  background: var(--timo-surface-hover);
+  color: var(--timo-text);
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.circular-button:hover {
+  background: var(--timo-btn-hover);
+  transform: scale(1.06);
+}
+
+.circular-button:active {
+  transform: scale(0.95);
+}
+
+/* Spotify Green Circular Play Button */
+.circular-button-green {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  padding: 12px;
+  background: var(--timo-green);
+  color: #000000;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.circular-button-green:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(30, 215, 96, 0.4);
+}
+
+.circular-button-green:active {
+  transform: scale(0.95);
+}
+
+/* ── Card & Container Styles ── */
+
+/* Spotify Card */
+.spotify-card {
+  background: var(--timo-surface);
+  border-radius: 8px;
+  padding: 16px;
+  border: none;
+  transition: background 0.15s ease;
+  box-shadow: none;
+}
+
+.spotify-card:hover {
+  background: var(--timo-surface-hover);
+}
+
+/* Elevated Card with Shadow */
+.spotify-card-elevated {
+  background: var(--timo-surface);
+  border-radius: 8px;
+  padding: 16px;
+  border: none;
+  box-shadow: var(--timo-shadow-medium);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.spotify-card-elevated:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--timo-shadow);
+}
+
+/* Dialog/Modal Shadow (Level 3) */
+.spotify-dialog-shadow {
+  box-shadow: var(--timo-shadow);
+}
+
+/* ── Input Styles ── */
+
+/* Spotify Search Input (Pill) */
+.spotify-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--timo-surface-hover);
+  color: var(--timo-text);
+  border: none;
+  border-radius: 9999px;
+  font-size: 14px;
+  outline: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--timo-shadow-inset);
+}
+
+.spotify-input:focus {
+  background: var(--timo-surface);
+  box-shadow: 0 0 0 2px var(--timo-green);
+}
+
+.spotify-input::placeholder {
+  color: var(--timo-text-secondary);
+}
+
+/* ── Focus Styles ── */
+
+:focus-visible {
+  outline: 2px solid var(--timo-green);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Utility Classes ── */
+
+/* Text colors */
+.text-primary { color: var(--timo-text); }
+.text-secondary { color: var(--timo-text-secondary); }
+.text-green { color: var(--timo-green); }
+.text-red { color: var(--timo-red); }
+.text-yellow { color: var(--timo-yellow); }
+.text-blue { color: var(--timo-blue); }
+.text-gray { color: var(--timo-gray); }
+
+/* Background colors */
+.bg-surface { background: var(--timo-surface); }
+.bg-surface-hover { background: var(--timo-surface-hover); }
+.bg-green { background: var(--timo-green); }
+
+/* Letter spacing utilities */
+.letter-spacing-button { letter-spacing: 1.4px; }
+.letter-spacing-wide { letter-spacing: 2px; }
+
+/* Text transform utilities */
+.text-uppercase { text-transform: uppercase; }
+
+/* Border radius utilities */
+.rounded-pill { border-radius: 9999px; }
+.rounded-circle { border-radius: 50%; }
+.rounded-card { border-radius: 8px; }
+.rounded-small { border-radius: 4px; }
+
+/* Shadow utilities */
+.shadow-medium { box-shadow: var(--timo-shadow-medium); }
+.shadow-heavy { box-shadow: var(--timo-shadow); }
+.shadow-inset { box-shadow: var(--timo-shadow-inset); }
+
+/* Transition utilities */
+.transition-smooth { transition: all 0.15s ease; }
+
+/* ── Notch pill (Timo-specific) ── */
 .notch-bar {
   position: relative;
   width: 96%;
   height: 64px;
-  background: var(--timo-bg);
+  background: var(--timo-surface);
   border-radius: 32px;
   cursor: pointer;
   box-sizing: border-box;
   overflow: hidden;
   margin: 0 auto;
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
+  box-shadow: var(--timo-shadow-medium);
 }
 
 .notch-bar:hover {
   width: 100%;
+  background: var(--timo-surface-hover);
 }
 
 /* Content area (above progress bar) */
@@ -171,7 +565,7 @@ html, body {
   color: var(--timo-text);
   font-size: 16px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
   letter-spacing: 0.3px;
   flex-shrink: 0;
   min-width: 44px;
@@ -200,7 +594,7 @@ html, body {
   color: var(--timo-gray);
   font-size: 16px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
   letter-spacing: 1px;
 }
 
@@ -212,7 +606,7 @@ html, body {
 }
 
 .sys-label {
-  color: var(--timo-border);
+  color: var(--timo-border-light);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -222,7 +616,7 @@ html, body {
   color: var(--timo-text);
   font-size: 16px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
 }
 
 /* ── Claude Code status ── */
@@ -261,7 +655,7 @@ html, body {
 .claude-dir {
   color: var(--timo-dir-color);
   font-size: 10px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -277,7 +671,7 @@ html, body {
   font-size: 11px;
   margin-left: 6px;
   padding: 1px 6px;
-  background: rgba(34, 197, 94, 0.2);
+  background: rgba(30, 215, 96, 0.2);
   border-radius: 4px;
   color: var(--timo-green);
   animation: pulse-badge 1.5s ease-in-out infinite;
@@ -293,7 +687,7 @@ html, body {
   color: var(--timo-text);
   font-size: 12px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   background: var(--timo-badge-bg);
   padding: 2px 8px;
   border-radius: 6px;
@@ -316,7 +710,7 @@ html, body {
   color: var(--timo-text);
   font-size: 16px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
   letter-spacing: 0.5px;
   flex-shrink: 0;
   min-width: 44px;
@@ -354,7 +748,6 @@ html, body {
 .notch-progress-fill.claude-progress {
   background: var(--timo-green);
   transition: width 0.5s ease-out;
-  /* Remove the indeterminate animation when we have real progress */
 }
 
 /* Indeterminate animation fallback for when toolCount is 0 */

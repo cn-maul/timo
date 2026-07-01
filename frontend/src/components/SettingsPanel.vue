@@ -424,6 +424,7 @@ function onDragStart(e: MouseEvent) {
 </template>
 
 <style scoped>
+/* ── SettingsPanel - Spotify Card & Sidebar System ── */
 .settings-overlay {
   position: fixed;
   inset: 0;
@@ -432,7 +433,7 @@ function onDragStart(e: MouseEvent) {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
 }
 
 .settings-standalone {
@@ -447,13 +448,13 @@ function onDragStart(e: MouseEvent) {
 
 .settings-panel {
   background: var(--timo-surface);
-  border: 1px solid var(--timo-border);
+  border: none;
   border-radius: 16px;
   width: 700px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--timo-shadow);
   color: var(--timo-text);
   overflow: hidden;
 }
@@ -482,7 +483,7 @@ function onDragStart(e: MouseEvent) {
 .settings-header h2 {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .close-btn {
@@ -507,10 +508,11 @@ function onDragStart(e: MouseEvent) {
   overflow: hidden;
 }
 
+/* ── Sidebar - Spotify Navigation Style ── */
 .sidebar {
   width: 120px;
   flex-shrink: 0;
-  background: var(--timo-btn-bg);
+  background: var(--timo-surface-hover);
   border-right: 1px solid var(--timo-border);
   padding: 12px 8px;
   display: flex;
@@ -526,8 +528,8 @@ function onDragStart(e: MouseEvent) {
   border: none;
   background: transparent;
   color: var(--timo-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 400;
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.15s;
@@ -542,6 +544,7 @@ function onDragStart(e: MouseEvent) {
 .sidebar-item.active {
   background: var(--timo-list-item-active);
   color: var(--timo-text);
+  font-weight: 700;
 }
 
 .sidebar-icon {
@@ -570,6 +573,7 @@ function onDragStart(e: MouseEvent) {
   color: var(--timo-gray);
 }
 
+/* ── Priority List - Spotify Card Style ── */
 .priority-list {
   display: flex;
   flex-direction: column;
@@ -583,7 +587,7 @@ function onDragStart(e: MouseEvent) {
   padding: 10px 14px;
   background: var(--timo-card-bg);
   border-radius: 10px;
-  border: 1px solid var(--timo-border);
+  border: none;
 }
 
 .priority-label {
@@ -592,8 +596,10 @@ function onDragStart(e: MouseEvent) {
 }
 
 .priority-badge {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--timo-gray);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
 }
 
 .move-btn {
@@ -612,6 +618,7 @@ function onDragStart(e: MouseEvent) {
   background: var(--timo-btn-hover);
 }
 
+/* ── Radio Grid - Spotify Card Style ── */
 .radio-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -627,7 +634,7 @@ function onDragStart(e: MouseEvent) {
   cursor: pointer;
   font-size: 13px;
   background: var(--timo-list-item-bg);
-  border: 1px solid var(--timo-border);
+  border: none;
   transition: all 0.15s;
 }
 
@@ -637,13 +644,14 @@ function onDragStart(e: MouseEvent) {
 
 .radio-item.active {
   background: var(--timo-list-item-active);
-  border-color: var(--timo-green);
+  border: 1px solid var(--timo-green);
 }
 
 .radio-item input {
   accent-color: var(--timo-green);
 }
 
+/* ── Theme Grid - Spotify Card Style ── */
 .theme-grid {
   display: flex;
   gap: 12px;
@@ -677,11 +685,11 @@ function onDragStart(e: MouseEvent) {
   width: 56px;
   height: 36px;
   border-radius: 8px;
-  border: 1px solid var(--timo-border);
+  border: none;
 }
 
 .theme-preview-dark {
-  background: linear-gradient(135deg, #1a1a1a 50%, #2a2a3a 50%);
+  background: linear-gradient(135deg, #121212 50%, #181818 50%);
 }
 
 .theme-preview-light {
@@ -693,6 +701,7 @@ function onDragStart(e: MouseEvent) {
   backdrop-filter: blur(10px);
 }
 
+/* ── Toggle List - Spotify Card Style ── */
 .toggle-list {
   display: flex;
   flex-direction: column;
@@ -709,7 +718,7 @@ function onDragStart(e: MouseEvent) {
   cursor: pointer;
   font-size: 13px;
   background: var(--timo-list-item-bg);
-  border: 1px solid var(--timo-border);
+  border: none;
   transition: all 0.15s;
 }
 
@@ -737,6 +746,7 @@ function onDragStart(e: MouseEvent) {
   margin-left: 28px; /* align with checkbox */
 }
 
+/* ── Info Box - Spotify Card Style ── */
 .info-box {
   background: var(--timo-card-bg);
   border-radius: 10px;
@@ -755,7 +765,7 @@ function onDragStart(e: MouseEvent) {
   color: var(--timo-text-secondary);
 }
 
-/* Hooks - grid layout for spacious cards */
+/* ── Hooks Grid - Spotify Card System ── */
 .hooks-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -766,7 +776,7 @@ function onDragStart(e: MouseEvent) {
   padding: 16px;
   background: var(--timo-card-bg);
   border-radius: 12px;
-  border: 1px solid var(--timo-border);
+  border: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -804,7 +814,7 @@ function onDragStart(e: MouseEvent) {
 .hook-warning {
   font-size: 12px;
   color: var(--timo-yellow);
-  background: rgba(255, 200, 0, 0.1);
+  background: rgba(255, 164, 43, 0.1);
   padding: 6px 10px;
   border-radius: 4px;
   margin: 8px 0;
@@ -836,13 +846,14 @@ function onDragStart(e: MouseEvent) {
 .hooks-feedback {
   margin-top: 12px;
   padding: 10px 14px;
-  background: rgba(34, 197, 94, 0.15);
+  background: rgba(30, 215, 96, 0.15);
   border-radius: 8px;
   font-size: 13px;
   text-align: center;
   color: var(--timo-green);
 }
 
+/* ── Footer - Spotify Button System ── */
 .settings-footer {
   flex-shrink: 0;
   display: flex;
@@ -852,14 +863,20 @@ function onDragStart(e: MouseEvent) {
   border-top: 1px solid var(--timo-border);
 }
 
+/* ── Button Styles - Spotify Pill & Circle Geometry ── */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 18px;
-  border-radius: 8px;
   border: none;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s, transform 0.1s;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
 }
 
 .btn:active {
@@ -874,6 +891,8 @@ function onDragStart(e: MouseEvent) {
 .btn-small {
   padding: 6px 14px;
   font-size: 12px;
+  border-radius: 9999px;
+  letter-spacing: 1.4px;
 }
 
 .btn-secondary {
@@ -892,15 +911,16 @@ function onDragStart(e: MouseEvent) {
 
 .btn-primary:hover {
   opacity: 0.9;
+  box-shadow: 0 0 0 2px var(--timo-green);
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: rgba(243, 114, 127, 0.2);
+  color: var(--timo-red);
 }
 
 .btn-danger:hover {
-  background: rgba(239, 68, 68, 0.3);
+  background: rgba(243, 114, 127, 0.35);
 }
 
 .close-btn:focus-visible,
@@ -908,7 +928,7 @@ function onDragStart(e: MouseEvent) {
 .sidebar-item:focus-visible,
 .theme-card:focus-visible,
 .move-btn:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
 }
 

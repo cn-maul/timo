@@ -308,14 +308,15 @@ const props = defineProps<{
 </template>
 
 <style scoped>
+/* ── NotchBar - Spotify-inspired Pill Geometry ── */
 .notch-bar:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
   border-radius: 8px;
 }
 
 .notch-play-icon:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -332,10 +333,10 @@ const props = defineProps<{
   border-width: 0;
 }
 
-/* Approval buttons in notch bar */
+/* ── Approval Buttons - Spotify Circle Geometry (50% radius) ── */
 .approve-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -345,7 +346,7 @@ const props = defineProps<{
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.1s, opacity 0.15s;
+  transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
 }
 
 .approve-btn:active {
@@ -353,7 +354,7 @@ const props = defineProps<{
 }
 
 .approve-btn:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
 }
 
@@ -364,6 +365,7 @@ const props = defineProps<{
 
 .approve-yes:hover {
   background: var(--timo-approve-yes-hover);
+  box-shadow: 0 0 0 2px var(--timo-green);
 }
 
 .approve-no {
@@ -373,5 +375,48 @@ const props = defineProps<{
 
 .approve-no:hover {
   background: var(--timo-approve-no-hover);
+  box-shadow: 0 0 0 2px var(--timo-red);
+}
+
+/* ── Tool Count Badge - Spotify Pill Style ── */
+.tool-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+
+/* ── Subagent Badge - Spotify Pill Style ── */
+.subagent-badge {
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+/* ── Traffic Light - Spotify Circle ── */
+.traffic-light {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+/* ── AI Status Dot - Spotify Circle with Glow ── */
+.ai-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ai-status-dot.running {
+  background: var(--timo-green);
+  box-shadow: 0 0 0 2px rgba(30, 215, 96, 0.3);
+}
+
+.ai-status-dot.attention {
+  background: var(--timo-yellow);
+  box-shadow: 0 0 0 2px rgba(255, 164, 43, 0.3);
+}
+
+.ai-status-dot.done {
+  background: var(--timo-red);
 }
 </style>

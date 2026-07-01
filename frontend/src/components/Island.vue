@@ -85,8 +85,9 @@ onUnmounted(() => {
   border-width: 0;
 }
 
+/* Spotify-inspired focus outline */
 .island-container:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
   border-radius: 8px;
 }

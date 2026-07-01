@@ -1,48 +1,68 @@
 /* Timo — dark theme (default) */
+/* Spotify-inspired dark immersive theme */
 /* Applied via data-theme="dark" on <html> */
 
 :root,
 [data-theme="dark"] {
-  --timo-bg: #1a1a1a;
-  --timo-bg-darker: #0d0d0d;
-  --timo-text: #fff;
-  --timo-text-secondary: #999;
-  --timo-surface: #252525;
-  --timo-surface-hover: #333;
-  --timo-border: #404040;
-  --timo-green: #22c55e;
-  --timo-yellow: #eab308;
-  --timo-red: #ef4444;
-  --timo-gray: #666;
+  /* ── Spotify Color Palette ── */
+  --timo-bg: #121212;              /* Near Black - deepest background */
+  --timo-bg-darker: #0a0a0a;       /* Even darker for contrast */
+  --timo-surface: #181818;          /* Dark Surface - cards, containers */
+  --timo-surface-hover: #1f1f1f;    /* Mid Dark - interactive surfaces */
+  --timo-surface-elevated: #252525; /* Dark Card - elevated surfaces */
+
+  /* Text colors */
+  --timo-text: #ffffff;             /* White - primary text */
+  --timo-text-secondary: #b3b3b3;   /* Silver - secondary text, muted labels */
+  --timo-text-near-white: #cbcbcb;  /* Near White - slightly brighter secondary */
+
+  /* Semantic colors */
+  --timo-green: #1ed760;            /* Spotify Green - primary brand accent */
+  --timo-green-border: #1db954;     /* Spotify Green Border variant */
+  --timo-red: #f3727f;              /* Negative Red - error states */
+  --timo-yellow: #ffa42b;           /* Warning Orange - warning states */
+  --timo-blue: #539df5;             /* Announcement Blue - info states */
+
+  /* Surface & Border */
+  --timo-border: #4d4d4d;           /* Border Gray - button borders on dark */
+  --timo-border-light: #7c7c7c;     /* Light Border - outlined button borders */
+  --timo-separator: #b3b3b3;        /* Separator - divider lines */
+  --timo-gray: #888888;             /* Neutral gray */
 
   /* Extended variables */
   --timo-remaining-color: #777;
-  --timo-progress-bg: rgba(255, 255, 255, 0.1);
-  --timo-progress-fill: rgba(255, 255, 255, 0.6);
-  --timo-play-bg: rgba(255, 255, 255, 0.12);
-  --timo-play-hover: rgba(255, 255, 255, 0.25);
+  --timo-progress-bg: rgba(255, 255, 255, 0.15);
+  --timo-progress-fill: rgba(255, 255, 255, 0.7);
+  --timo-play-bg: rgba(255, 255, 255, 0.15);
+  --timo-play-hover: rgba(255, 255, 255, 0.30);
   --timo-dir-color: #555;
   --timo-tool-color: #888;
-  --timo-glow-green: rgba(34, 197, 94, 0.4);
-  --timo-glow-yellow: rgba(234, 179, 8, 0.4);
-  --timo-glow-red: rgba(239, 68, 68, 0.4);
-  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --timo-overlay-bg: rgba(0, 0, 0, 0.5);
+  --timo-glow-green: rgba(30, 215, 96, 0.4);
+  --timo-glow-yellow: rgba(255, 164, 43, 0.4);
+  --timo-glow-red: rgba(243, 114, 127, 0.4);
 
-  /* Approval button backgrounds */
-  --timo-approve-yes-bg: rgba(34, 197, 94, 0.2);
-  --timo-approve-yes-hover: rgba(34, 197, 94, 0.35);
-  --timo-approve-no-bg: rgba(239, 68, 68, 0.2);
-  --timo-approve-no-hover: rgba(239, 68, 68, 0.35);
+  /* Spotify-inspired heavy shadows */
+  --timo-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);        /* Dialogs, menus, elevated */
+  --timo-shadow-medium: 0 8px 8px rgba(0, 0, 0, 0.3);  /* Cards, dropdowns */
+  --timo-shadow-inset: rgb(18,18,18) 0px 1px 0px, rgb(124,124,124) 0px 0px 0px 1px inset;
+
+  /* Overlay */
+  --timo-overlay-bg: rgba(0, 0, 0, 0.75);
   --timo-backdrop-filter: none;
 
-  /* Dark-mode button & card backgrounds (light-tinted on dark surface) */
+  /* Approval button backgrounds - Spotify green for yes, red for no */
+  --timo-approve-yes-bg: rgba(30, 215, 96, 0.15);
+  --timo-approve-yes-hover: rgba(30, 215, 96, 0.30);
+  --timo-approve-no-bg: rgba(243, 114, 127, 0.15);
+  --timo-approve-no-hover: rgba(243, 114, 127, 0.30);
+
+  /* Dark-mode button & card backgrounds */
   --timo-btn-bg: rgba(255, 255, 255, 0.08);
   --timo-btn-hover: rgba(255, 255, 255, 0.14);
-  --timo-card-bg: rgba(255, 255, 255, 0.04);
-  --timo-card-hover: rgba(255, 255, 255, 0.06);
-  --timo-list-item-bg: rgba(255, 255, 255, 0.03);
-  --timo-list-item-hover: rgba(255, 255, 255, 0.06);
-  --timo-list-item-active: rgba(255, 255, 255, 0.1);
-  --timo-badge-bg: rgba(255, 255, 255, 0.1);
+  --timo-card-bg: rgba(255, 255, 255, 0.05);
+  --timo-card-hover: rgba(255, 255, 255, 0.08);
+  --timo-list-item-bg: rgba(255, 255, 255, 0.04);
+  --timo-list-item-hover: rgba(255, 255, 255, 0.08);
+  --timo-list-item-active: rgba(255, 255, 255, 0.12);
+  --timo-badge-bg: rgba(255, 255, 255, 0.10);
 }

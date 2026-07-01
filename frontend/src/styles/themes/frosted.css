@@ -1,46 +1,69 @@
 /* Timo — frosted glass theme */
 /* Applied via data-theme="frosted" on <html> */
+/* Spotify-inspired frosted glass with dark immersion */
 
 [data-theme="frosted"] {
-  --timo-bg: transparent;
-  --timo-text: #fff;
-  --timo-text-secondary: rgba(255, 255, 255, 0.7);
-  --timo-surface: rgba(30, 30, 50, 0.55);
-  --timo-surface-hover: rgba(60, 60, 100, 0.4);
-  --timo-border: rgba(255, 255, 255, 0.15);
-  --timo-green: #4ade80;
-  --timo-yellow: #facc15;
-  --timo-red: #f87171;
-  --timo-gray: rgba(255, 255, 255, 0.4);
+  /* Frosted background - transparent to show desktop */
+  --timo-bg: rgba(18, 18, 18, 0.45);
+  --timo-bg-darker: rgba(10, 10, 10, 0.55);
+  
+  /* Frosted surfaces */
+  --timo-surface: rgba(30, 30, 30, 0.60);
+  --timo-surface-hover: rgba(45, 45, 45, 0.70);
+  --timo-surface-elevated: rgba(50, 50, 50, 0.75);
+
+  /* Text colors - white for readability on frosted */
+  --timo-text: #ffffff;
+  --timo-text-secondary: rgba(255, 255, 255, 0.75);
+  --timo-text-near-white: rgba(255, 255, 255, 0.85);
+
+  /* Semantic colors - Spotify green stays vibrant */
+  --timo-green: #1ed760;
+  --timo-green-border: #1db954;
+  --timo-red: #f3727f;
+  --timo-yellow: #ffa42b;
+  --timo-blue: #539df5;
+
+  /* Surface & Border */
+  --timo-border: rgba(255, 255, 255, 0.12);
+  --timo-border-light: rgba(255, 255, 255, 0.20);
+  --timo-separator: rgba(255, 255, 255, 0.30);
+  --timo-gray: rgba(255, 255, 255, 0.50);
 
   /* Extended variables */
-  --timo-remaining-color: rgba(255, 255, 255, 0.6);
-  --timo-progress-bg: rgba(255, 255, 255, 0.08);
-  --timo-progress-fill: rgba(255, 255, 255, 0.5);
-  --timo-play-bg: rgba(255, 255, 255, 0.15);
-  --timo-play-hover: rgba(255, 255, 255, 0.25);
-  --timo-dir-color: rgba(255, 255, 255, 0.45);
-  --timo-tool-color: rgba(255, 255, 255, 0.6);
-  --timo-glow-green: rgba(74, 222, 128, 0.5);
-  --timo-glow-yellow: rgba(250, 204, 21, 0.5);
-  --timo-glow-red: rgba(248, 113, 113, 0.5);
-  --timo-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --timo-overlay-bg: rgba(0, 0, 0, 0.3);
-  --timo-backdrop-filter: blur(20px) saturate(1.4);
+  --timo-remaining-color: rgba(255, 255, 255, 0.60);
+  --timo-progress-bg: rgba(255, 255, 255, 0.10);
+  --timo-progress-fill: rgba(255, 255, 255, 0.60);
+  --timo-play-bg: rgba(255, 255, 255, 0.18);
+  --timo-play-hover: rgba(255, 255, 255, 0.30);
+  --timo-dir-color: rgba(255, 255, 255, 0.50);
+  --timo-tool-color: rgba(255, 255, 255, 0.65);
+  --timo-glow-green: rgba(30, 215, 96, 0.5);
+  --timo-glow-yellow: rgba(255, 164, 43, 0.5);
+  --timo-glow-red: rgba(243, 114, 127, 0.5);
 
-  /* Frosted button & card backgrounds (light-tinted on glass) */
-  --timo-btn-bg: rgba(255, 255, 255, 0.1);
+  /* Frosted shadows - softer but still visible */
+  --timo-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  --timo-shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --timo-shadow-inset: rgba(0,0,0,0.2) 0px 1px 0px, rgba(255,255,255,0.10) 0px 0px 0px 1px inset;
+
+  /* Overlay with stronger backdrop blur */
+  --timo-overlay-bg: rgba(0, 0, 0, 0.60);
+  --timo-backdrop-filter: blur(24px) saturate(1.5);
+
+  /* Approval buttons for frosted */
+  --timo-approve-yes-bg: rgba(30, 215, 96, 0.20);
+  --timo-approve-yes-hover: rgba(30, 215, 96, 0.35);
+  --timo-approve-no-bg: rgba(243, 114, 127, 0.20);
+  --timo-approve-no-hover: rgba(243, 114, 127, 0.35);
+
+  /* Button & card backgrounds for frosted */
+  --timo-btn-bg: rgba(255, 255, 255, 0.10);
   --timo-btn-hover: rgba(255, 255, 255, 0.18);
-  --timo-card-bg: rgba(255, 255, 255, 0.05);
-  --timo-card-hover: rgba(255, 255, 255, 0.08);
-  --timo-list-item-bg: rgba(255, 255, 255, 0.04);
-  --timo-list-item-hover: rgba(255, 255, 255, 0.08);
-  --timo-list-item-active: rgba(255, 255, 255, 0.12);
+  --timo-card-bg: rgba(255, 255, 255, 0.06);
+  --timo-card-hover: rgba(255, 255, 255, 0.10);
+  --timo-list-item-bg: rgba(255, 255, 255, 0.05);
+  --timo-list-item-hover: rgba(255, 255, 255, 0.10);
+  --timo-list-item-active: rgba(255, 255, 255, 0.15);
   --timo-badge-bg: rgba(255, 255, 255, 0.12);
-
-  /* Approval button backgrounds */
-  --timo-approve-yes-bg: rgba(74, 222, 128, 0.25);
-  --timo-approve-yes-hover: rgba(74, 222, 128, 0.4);
-  --timo-approve-no-bg: rgba(248, 113, 113, 0.25);
-  --timo-approve-no-hover: rgba(248, 113, 113, 0.4);
 }

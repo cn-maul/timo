@@ -174,7 +174,13 @@ function formatDuration(ms: number): string {
 </template>
 
 <style scoped>
-/* AI Panel Styles */
+/* ── DropPanel - Spotify Card Geometry ── */
+.drop-panel {
+  border-radius: 0 0 18px 18px;
+  padding: 16px;
+}
+
+/* ── AI Panel Styles - Spotify Card System ── */
 .ai-panel {
   display: flex;
   flex-direction: column;
@@ -218,13 +224,13 @@ function formatDuration(ms: number): string {
 
 .ai-status-dot.running {
   background: var(--timo-green);
-  box-shadow: 0 0 6px var(--timo-green);
+  box-shadow: 0 0 0 2px rgba(30, 215, 96, 0.3);
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
 .ai-status-dot.attention {
   background: var(--timo-yellow);
-  box-shadow: 0 0 6px var(--timo-yellow);
+  box-shadow: 0 0 0 2px rgba(255, 164, 43, 0.3);
 }
 
 .ai-status-dot.done {
@@ -248,14 +254,16 @@ function formatDuration(ms: number): string {
 .ai-elapsed {
   font-size: 18px;
   font-weight: 700;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   color: var(--timo-text);
 }
 
+/* ── Current Tool Card - Spotify Elevated Card ── */
 .ai-current {
   background: var(--timo-card-bg);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  border: none;
 }
 
 .current-tool {
@@ -293,11 +301,12 @@ function formatDuration(ms: number): string {
   text-overflow: ellipsis;
 }
 
+/* ── Subagent Card - Spotify Green Accent ── */
 .ai-subagent {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: rgba(30, 215, 96, 0.1);
+  border: 1px solid rgba(30, 215, 96, 0.2);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .subagent-header {
@@ -344,17 +353,19 @@ function formatDuration(ms: number): string {
   margin-right: 4px;
 }
 
+/* ── History Section - Spotify Separator Style ── */
 .ai-history {
   border-top: 1px solid var(--timo-border);
   padding-top: 10px;
 }
 
 .history-title {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--timo-gray);
   margin-bottom: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.4px;
 }
 
 .history-list {
@@ -390,6 +401,7 @@ function formatDuration(ms: number): string {
   font-family: monospace;
 }
 
+/* ── Stats Section - Spotify Separator Style ── */
 .ai-stats {
   display: flex;
   gap: 16px;
@@ -407,7 +419,7 @@ function formatDuration(ms: number): string {
   font-size: 10px;
   color: var(--timo-gray);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.4px;
 }
 
 .stat-value {
@@ -416,11 +428,12 @@ function formatDuration(ms: number): string {
   font-weight: 600;
 }
 
+/* ── Attention/Approval Card - Spotify Warning Style ── */
 .ai-attention {
   display: flex;
   gap: 12px;
-  background: rgba(234, 179, 8, 0.1);
-  border: 1px solid rgba(234, 179, 8, 0.2);
+  background: rgba(255, 164, 43, 0.1);
+  border: 1px solid rgba(255, 164, 43, 0.2);
   border-radius: 8px;
   padding: 12px;
 }
@@ -445,6 +458,7 @@ function formatDuration(ms: number): string {
   line-height: 1.4;
 }
 
+/* ── Approval Actions - Spotify Pill Buttons ── */
 .approval-actions {
   display: flex;
   align-items: center;
@@ -452,19 +466,24 @@ function formatDuration(ms: number): string {
 }
 
 .approval-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--timo-gray);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
   margin-right: 4px;
 }
 
 .approve-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: 9999px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.1s, opacity 0.15s;
+  transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
 }
 
 .approve-btn:active {
@@ -472,30 +491,33 @@ function formatDuration(ms: number): string {
 }
 
 .approve-btn:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
 }
 
 .approve-yes {
-  background: rgba(34, 197, 94, 0.2);
+  background: var(--timo-approve-yes-bg);
   color: var(--timo-green);
 }
 
 .approve-yes:hover {
-  background: rgba(34, 197, 94, 0.35);
+  background: var(--timo-approve-yes-hover);
+  box-shadow: 0 0 0 2px var(--timo-green);
 }
 
 .approve-no {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: var(--timo-approve-no-bg);
+  color: var(--timo-red);
 }
 
 .approve-no:hover {
-  background: rgba(239, 68, 68, 0.35);
+  background: var(--timo-approve-no-hover);
+  box-shadow: 0 0 0 2px var(--timo-red);
 }
 
+/* ── Control Buttons - Spotify Circle Geometry ── */
 .control-btn:focus-visible {
-  outline: 2px solid var(--timo-green, #22c55e);
+  outline: 2px solid var(--timo-green);
   outline-offset: 2px;
 }
 
