@@ -14,3 +14,8 @@ build/android/gen/
 .reasonix/
 deepseek-color.svg
 timo
+# Debian build artifacts
+debian/debhelper-build-stamp
+debian/files
+debian/*.substvars
+debian/timo/
