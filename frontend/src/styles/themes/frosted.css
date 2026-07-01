@@ -37,4 +37,10 @@
   --timo-list-item-hover: rgba(255, 255, 255, 0.08);
   --timo-list-item-active: rgba(255, 255, 255, 0.12);
   --timo-badge-bg: rgba(255, 255, 255, 0.12);
+
+  /* Approval button backgrounds */
+  --timo-approve-yes-bg: rgba(74, 222, 128, 0.25);
+  --timo-approve-yes-hover: rgba(74, 222, 128, 0.4);
+  --timo-approve-no-bg: rgba(248, 113, 113, 0.25);
+  --timo-approve-no-hover: rgba(248, 113, 113, 0.4);
 }

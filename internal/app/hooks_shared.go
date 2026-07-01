@@ -300,7 +300,7 @@ func buildHooksConfig(hookCmd string, typePrefix string) map[string]interface{} 
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": hookCmd + ` notify --type claude-notify --msg "` + msgConfirmNeeded + `"`,
+						"command": hookCmd + ` notify --type claude-notify`,
 					},
 				},
 			},

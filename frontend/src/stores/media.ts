@@ -64,7 +64,7 @@ export const useMediaStore = defineStore('media', () => {
     durationMs.value = info.durationMs
     positionMs.value = info.positionMs
     playing.value = info.playing
-    hasMedia.value = !!(info.title || info.artist)
+    hasMedia.value = !!(info.title || info.artist || info.playing)
   }
 
   function clear() {

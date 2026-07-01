@@ -17,7 +17,6 @@ type MediaInfo struct {
 	Artist      string `json:"artist"`
 	Album       string `json:"album"`
 	CoverURL    string `json:"coverUrl"`
-	CoverBase64 string `json:"coverBase64,omitempty"`
 	DurationMs  int64  `json:"durationMs"`
 	PositionMs  int64  `json:"positionMs"`
 	Playing     bool   `json:"playing"`

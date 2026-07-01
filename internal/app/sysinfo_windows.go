@@ -33,6 +33,8 @@ type SystemStats struct {
 }
 
 // SystemPoller periodically queries system stats using gopsutil.
+// Note: gopsutil's cpu.Percent() handles CPU delta internally, so
+// we don't need prevIdle/prevTotal fields like the Linux (/proc/stat) version.
 type SystemPoller struct {
 	emitter func(SystemStats)
 	stopCh  chan struct{}

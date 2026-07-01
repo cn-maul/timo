@@ -44,11 +44,7 @@ const hooksStatus = ref({
 const hooksLoading = ref(false)
 const hooksFeedback = ref('')
 
-// Store timeout IDs for proper cleanup
-const feedbackTimers: ReturnType<typeof setTimeout>[] = []
-const loadingTimers: ReturnType<typeof setTimeout>[] = []
-
-// Track active setTimeout IDs for cleanup
+// Track active setTimeout IDs for cleanup on unmount
 const pendingTimers: ReturnType<typeof setTimeout>[] = []
 
 function scheduleTimer(fn: () => void, ms: number): ReturnType<typeof setTimeout> {

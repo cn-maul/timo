@@ -44,6 +44,9 @@ func NewLinuxProvider() (*LinuxProvider, error) {
 
 // findPlayer returns the bus name of an active MPRIS player, preferring
 // the last active player for stability when multiple players are running.
+// If multiple players exist and none was the last active, picks the one
+// that is actively playing ("Playing" status). Falls back to the first
+// registered player if nothing is playing.
 func (p *LinuxProvider) findPlayer() string {
 	var names []string
 	err := p.conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names)
@@ -51,19 +54,43 @@ func (p *LinuxProvider) findPlayer() string {
 		return ""
 	}
 	var first string
+	var playing string
 	for _, name := range names {
-		if strings.HasPrefix(name, mprisPrefix) && name != mprisPrefix+"d" {
-			if first == "" {
-				first = name
-			}
-			// Prefer the last active player for stability
-			if name == p.lastPlayer {
-				return name
-			}
+		if !strings.HasPrefix(name, mprisPrefix) || name == mprisPrefix+"d" {
+			continue
 		}
+		if first == "" {
+			first = name
+		}
+		// Prefer the last active player for stability, but only if it's
+		// still actively playing. If it went idle, keep looking for a
+		// playing player.
+		if name == p.lastPlayer && isPlayerPlaying(p.conn, name) {
+			return name
+		}
+		// Check if this player is actively playing
+		if playing == "" && isPlayerPlaying(p.conn, name) {
+			playing = name
+		}
+	}
+	// If no last player matched, prefer an actively playing player
+	if playing != "" {
+		p.lastPlayer = playing
+		return playing
 	}
 	p.lastPlayer = first
 	return first
+}
+
+// isPlayerPlaying returns true if the given MPRIS player is in "Playing" state.
+func isPlayerPlaying(conn *dbus.Conn, busName string) bool {
+	obj := conn.Object(busName, dbus.ObjectPath(mprisObject))
+	statusVar, err := obj.GetProperty(mprisPlayerIface + ".PlaybackStatus")
+	if err != nil {
+		return false
+	}
+	status, ok := statusVar.Value().(string)
+	return ok && status == "Playing"
 }
 
 func (p *LinuxProvider) getPlayerObject() (dbus.BusObject, error) {
@@ -118,13 +145,22 @@ func (p *LinuxProvider) GetState() (*MediaInfo, error) {
 		info.CoverURL, _ = v.Value().(string)
 	}
 	if v, ok := metadata["mpris:length"]; ok {
+		var lengthVal int64
 		switch val := v.Value().(type) {
 		case int64:
-			info.DurationMs = val / 1000
+			lengthVal = val
 		case uint64:
-			info.DurationMs = int64(val / 1000)
+			lengthVal = int64(val)
 		case float64:
-			info.DurationMs = int64(val / 1000)
+			lengthVal = int64(val)
+		}
+		// MPRIS spec says length is in microseconds. Some players
+		// (e.g. Deepin Music) report in milliseconds. Auto-detect:
+		// divide by 1000 first; if result is < 1 second and the
+		// raw value is >= 1000, the player sent milliseconds.
+		info.DurationMs = lengthVal / 1000
+		if info.DurationMs < 1000 && lengthVal >= 1000 {
+			info.DurationMs = lengthVal
 		}
 	}
 

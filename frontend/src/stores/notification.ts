@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { Events } from '@wailsio/runtime'
 import type { Notification } from '../../bindings/timo/internal/app/models'
 
 const DONE_CLEAR_DELAY = 5000
@@ -139,6 +140,9 @@ export const useNotificationStore = defineStore('notification', () => {
   // Computed display values
   const toolIcon = computed(() => TOOL_ICONS[tool.value] || '🔧')
 
+  /** True when we're in 'attention' state with a question message (approval needed) */
+  const isApproval = computed(() => state.value === 'attention' && message.value !== '')
+
   const phase = computed(() => {
     if (state.value === 'attention') return 'attention'
     if (state.value === 'done') return 'done'
@@ -258,177 +262,63 @@ export const useNotificationStore = defineStore('notification', () => {
       clearTimer = null
     }
 
-    const typePrefix = notif.type.startsWith('reasonix') ? 'reasonix' : 'claude'
+    const type = notif.type
+    const typePrefix = type.startsWith('reasonix') ? 'reasonix' : 'claude'
 
-    switch (notif.type) {
+    switch (type) {
+      // ── Prompt start (primary "work started" signal) ──
       case 'claude-prompt':
       case 'reasonix-prompt':
-        // User submitted a new prompt — primary "work started" signal
-        source.value = typePrefix
-        if (notif.topic) topic.value = notif.topic
-        if (notif.workDir) workDir.value = notif.workDir
-        subagent.value = false
-        agentType.value = ''
-        agentDesc.value = ''
-        toolHistory.value = []
-        toolCount.value = 0
-        if (state.value !== 'running') {
-          startedAt.value = Date.now()
-          elapsed.value = 0
-        }
-        state.value = 'running'
-        message.value = ''
-        tool.value = ''
-        toolInput.value = undefined
-        startTicker()
+        handlePromptStart(notif, typePrefix)
         break
 
+      // ── Tool lifecycle ──
       case 'claude-pre-tool':
       case 'reasonix-pre-tool':
-        // PreToolUse: tool is about to execute (before execution)
-        source.value = typePrefix
-        tool.value = notif.tool || ''
-        toolInput.value = notif.toolInput
-        isPreTool.value = true
-        durationMs.value = 0
-        // If we're not in running state, start
-        if (state.value !== 'running') {
-          state.value = 'running'
-          startedAt.value = Date.now()
-          elapsed.value = 0
-          startTicker()
-        }
+        handlePreTool(notif, typePrefix)
         break
-
       case 'claude-tool':
       case 'reasonix-tool':
-        // PostToolUse: tool completed
-        source.value = typePrefix
-        if (notif.tool) tool.value = notif.tool
-        toolInput.value = notif.toolInput
-        toolOutput.value = notif.toolOutput
-        durationMs.value = notif.durationMs || 0
-        isPreTool.value = false
-        // Increment tool count for progress
-        toolCount.value++
-        // Add to history
-        if (notif.tool) {
-          const info = getToolDisplayInfo(notif.tool, notif.toolInput)
-          toolHistory.value.push({
-            tool: notif.tool,
-            target: info.target,
-            duration: notif.durationMs || 0,
-          })
-          // Keep last 20 items
-          if (toolHistory.value.length > 20) {
-            toolHistory.value.shift()
-          }
-        }
-        // If we're not in running state, start (covers edge cases)
-        if (state.value !== 'running') {
-          state.value = 'running'
-          startedAt.value = Date.now()
-          elapsed.value = 0
-          startTicker()
-        }
+        handlePostTool(notif, typePrefix)
         break
 
+      // ── Subagent lifecycle ──
       case 'claude-subagent':
       case 'reasonix-subagent':
-        subagent.value = true
-        agentType.value = notif.agentType || ''
-        agentDesc.value = notif.agentDesc || ''
+        handleSubagentStart(notif)
         break
-
       case 'claude-subagent-stop':
       case 'reasonix-subagent-stop':
-        // Subagent completed with result
-        agentResult.value = notif.agentResult || ''
-        // Keep subagent flag true until next main tool
+        handleSubagentStop(notif)
         break
-
-      case 'claude-subagent-done':
-        // Legacy event - subagent finished (old behavior)
+      case 'claude-subagent-done': // legacy
         subagent.value = false
         agentResult.value = ''
         break
 
+      // ── Attention / notification ──
       case 'claude-notify':
       case 'reasonix-notify':
-        // Permission prompt or attention needed
-        source.value = typePrefix
-        state.value = 'attention'
-        message.value = notif.message || '需要关注'
-        stopTicker()
-        clearTimer = setTimeout(() => reset(), ATTENTION_CLEAR_DELAY)
+        handleNotify(notif, typePrefix)
         break
 
+      // ── Completion ──
       case 'claude-done':
       case 'reasonix-done':
-        // Work completed (Stop/SessionEnd event or process exit)
-        state.value = 'done'
-        finalMsg.value = notif.finalMsg || notif.message || '完成'
-        message.value = finalMsg.value
-        stopTicker()
-        clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
+        handleDone(notif)
         break
-
       case 'claude-stop':
       case 'reasonix-stop':
-        // Stop event from hook - Claude finished responding
-        // Generate summary with tool stats
-        state.value = 'done'
-        const baseMsg = notif.finalMsg || notif.agentResult || notif.message || '任务完成'
-        const summary = toolSummary.value
-        if (summary) {
-          finalMsg.value = `${baseMsg} · ${summary}`
-          message.value = finalMsg.value
-        } else {
-          finalMsg.value = baseMsg
-          message.value = baseMsg
-        }
-        stopTicker()
-        clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
+        handleStop(notif)
         break
 
+      // ── Reasonix-specific ──
       case 'reasonix-session-start':
-        // Session started - reset state, set source
-        source.value = 'reasonix'
-        if (notif.workDir) workDir.value = notif.workDir
-        subagent.value = false
-        agentType.value = ''
-        agentDesc.value = ''
-        toolHistory.value = []
-        toolCount.value = 0
-        state.value = 'running'
-        message.value = ''
-        tool.value = ''
-        toolInput.value = undefined
-        startedAt.value = Date.now()
-        elapsed.value = 0
-        startTicker()
+        handleSessionStart(notif)
         break
-
       case 'reasonix-llm':
-        // PostLLMCall - keep running heartbeat (no UI display of reasoning per plan)
-        source.value = 'reasonix'
-        if (state.value !== 'running') {
-          state.value = 'running'
-          startedAt.value = Date.now()
-          elapsed.value = 0
-          startTicker()
-        }
-        break
-
       case 'reasonix-precompact':
-        // PreCompact - keep running heartbeat, no special UI
-        source.value = 'reasonix'
-        if (state.value !== 'running') {
-          state.value = 'running'
-          startedAt.value = Date.now()
-          elapsed.value = 0
-          startTicker()
-        }
+        handleHeartbeat(typePrefix)
         break
 
       default:
@@ -440,6 +330,142 @@ export const useNotificationStore = defineStore('notification', () => {
           stopTicker()
           clearTimer = setTimeout(() => reset(), ATTENTION_CLEAR_DELAY)
         }
+    }
+  }
+
+  /** Ensure we're in running state, starting the elapsed ticker if needed. */
+  function ensureRunning(typePrefix: 'claude' | 'reasonix') {
+    source.value = typePrefix
+    if (state.value !== 'running') {
+      state.value = 'running'
+      startedAt.value = Date.now()
+      elapsed.value = 0
+      startTicker()
+    }
+  }
+
+  /** Reset tracking for a new prompt session. */
+  function resetSession(notif: Notification & { topic?: string }, typePrefix: 'claude' | 'reasonix') {
+    source.value = typePrefix
+    if (notif.topic) topic.value = notif.topic
+    if (notif.workDir) workDir.value = notif.workDir
+    subagent.value = false
+    agentType.value = ''
+    agentDesc.value = ''
+    toolHistory.value = []
+    toolCount.value = 0
+    if (state.value !== 'running') {
+      startedAt.value = Date.now()
+      elapsed.value = 0
+    }
+    state.value = 'running'
+    message.value = ''
+    tool.value = ''
+    toolInput.value = undefined
+    startTicker()
+  }
+
+  function handlePromptStart(notif: Notification & { topic?: string }, typePrefix: 'claude' | 'reasonix') {
+    resetSession(notif, typePrefix)
+  }
+
+  function handlePreTool(notif: Notification, typePrefix: 'claude' | 'reasonix') {
+    ensureRunning(typePrefix)
+    tool.value = notif.tool || ''
+    toolInput.value = notif.toolInput
+    isPreTool.value = true
+    durationMs.value = 0
+  }
+
+  function handlePostTool(notif: Notification, typePrefix: 'claude' | 'reasonix') {
+    ensureRunning(typePrefix)
+    if (notif.tool) tool.value = notif.tool
+    toolInput.value = notif.toolInput
+    toolOutput.value = notif.toolOutput
+    durationMs.value = notif.durationMs || 0
+    isPreTool.value = false
+    toolCount.value++
+
+    if (notif.tool) {
+      const info = getToolDisplayInfo(notif.tool, notif.toolInput)
+      toolHistory.value.push({
+        tool: notif.tool,
+        target: info.target,
+        duration: notif.durationMs || 0,
+      })
+      // Keep last 20 items
+      if (toolHistory.value.length > 20) {
+        toolHistory.value.shift()
+      }
+    }
+  }
+
+  function handleSubagentStart(notif: Notification) {
+    subagent.value = true
+    agentType.value = notif.agentType || ''
+    agentDesc.value = notif.agentDesc || ''
+  }
+
+  function handleSubagentStop(notif: Notification) {
+    agentResult.value = notif.agentResult || ''
+    // Keep subagent flag true until next main tool
+  }
+
+  function handleNotify(notif: Notification, typePrefix: 'claude' | 'reasonix') {
+    source.value = typePrefix
+    state.value = 'attention'
+    message.value = notif.message || '需要关注'
+    stopTicker()
+    clearTimer = setTimeout(() => reset(), ATTENTION_CLEAR_DELAY)
+  }
+
+  function handleDone(notif: Notification) {
+    state.value = 'done'
+    finalMsg.value = notif.finalMsg || notif.message || '完成'
+    message.value = finalMsg.value
+    stopTicker()
+    clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
+  }
+
+  function handleStop(notif: Notification) {
+    state.value = 'done'
+    const baseMsg = notif.finalMsg || notif.agentResult || notif.message || '任务完成'
+    const summary = toolSummary.value
+    if (summary) {
+      finalMsg.value = `${baseMsg} · ${summary}`
+      message.value = finalMsg.value
+    } else {
+      finalMsg.value = baseMsg
+      message.value = baseMsg
+    }
+    stopTicker()
+    clearTimer = setTimeout(() => reset(), DONE_CLEAR_DELAY)
+  }
+
+  function handleSessionStart(notif: Notification) {
+    source.value = 'reasonix'
+    if (notif.workDir) workDir.value = notif.workDir
+    subagent.value = false
+    agentType.value = ''
+    agentDesc.value = ''
+    toolHistory.value = []
+    toolCount.value = 0
+    state.value = 'running'
+    message.value = ''
+    tool.value = ''
+    toolInput.value = undefined
+    startedAt.value = Date.now()
+    elapsed.value = 0
+    startTicker()
+  }
+
+  function handleHeartbeat(typePrefix: 'claude' | 'reasonix') {
+    source.value = typePrefix
+    if (state.value !== 'running') {
+      state.value = 'running'
+      startedAt.value = Date.now()
+      elapsed.value = 0
+      startTicker()
     }
   }
 
@@ -475,6 +501,18 @@ export const useNotificationStore = defineStore('notification', () => {
     reset()
   }
 
+  /** Approve the current approval prompt (✅) */
+  function approve() {
+    Events.Emit('approve-response', 'approve')
+    reset()
+  }
+
+  /** Reject the current approval prompt (❌) */
+  function reject() {
+    Events.Emit('approve-response', 'reject')
+    reset()
+  }
+
   return {
     state,
     source,
@@ -498,6 +536,7 @@ export const useNotificationStore = defineStore('notification', () => {
     // Computed display values
     toolIcon,
     phase,
+    isApproval,
     toolTarget,
     toolContext,
     agentTypeName,
@@ -509,6 +548,8 @@ export const useNotificationStore = defineStore('notification', () => {
     // Methods
     handle,
     clear,
+    approve,
+    reject,
     // Helpers (exported for use in components)
     TOOL_ICONS,
   }

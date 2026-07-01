@@ -105,10 +105,20 @@ function formatDuration(ms: number): string {
           </div>
         </div>
 
-        <!-- Attention message -->
+        <!-- Attention / Approval message -->
         <div class="ai-attention" v-if="notif.state === 'attention'">
-          <div class="attention-icon">⚠️</div>
-          <div class="attention-message">{{ notif.message }}</div>
+          <div class="attention-icon">
+            <template v-if="notif.isApproval">❓</template>
+            <template v-else>⚠️</template>
+          </div>
+          <div class="attention-content">
+            <div class="attention-message">{{ notif.message || '需要关注' }}</div>
+            <div class="approval-actions" v-if="notif.isApproval">
+              <span class="approval-label">你的选择：</span>
+              <button class="approve-btn approve-yes" aria-label="同意" @click="notif.approve()">✓ 同意</button>
+              <button class="approve-btn approve-no" aria-label="拒绝" @click="notif.reject()">✗ 拒绝</button>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -408,7 +418,6 @@ function formatDuration(ms: number): string {
 
 .ai-attention {
   display: flex;
-  align-items: center;
   gap: 12px;
   background: rgba(234, 179, 8, 0.1);
   border: 1px solid rgba(234, 179, 8, 0.2);
@@ -418,11 +427,71 @@ function formatDuration(ms: number): string {
 
 .attention-icon {
   font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.attention-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .attention-message {
   font-size: 13px;
   color: var(--timo-text);
+  line-height: 1.4;
+}
+
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.approval-label {
+  font-size: 12px;
+  color: var(--timo-gray);
+  margin-right: 4px;
+}
+
+.approve-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.15s;
+}
+
+.approve-btn:active {
+  transform: scale(0.95);
+}
+
+.approve-btn:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+}
+
+.approve-yes {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--timo-green);
+}
+
+.approve-yes:hover {
+  background: rgba(34, 197, 94, 0.35);
+}
+
+.approve-no {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.approve-no:hover {
+  background: rgba(239, 68, 68, 0.35);
 }
 
 .control-btn:focus-visible {

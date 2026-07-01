@@ -24,6 +24,20 @@ function defaultSettings(): TimoSettings {
   }
 }
 
+// ── Type-safe validators (mirrors settingsevents.go) ──
+
+function isValidIdleDisplay(v: string): v is 'all' | 'cpu' | 'mem' | 'net' | 'none' {
+  return ['all', 'cpu', 'mem', 'net', 'none'].includes(v)
+}
+
+function isValidTheme(v: string): v is 'dark' | 'light' | 'frosted' {
+  return ['dark', 'light', 'frosted'].includes(v)
+}
+
+function isValidNetUnit(v: string): v is 'auto' | 'kb' | 'mb' {
+  return ['auto', 'kb', 'mb'].includes(v)
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const displayPriority = ref<string[]>(['ai', 'media'])
   const idleDisplay = ref<'all' | 'cpu' | 'mem' | 'net' | 'none'>('all')
@@ -66,13 +80,18 @@ export const useSettingsStore = defineStore('settings', () => {
   Events.On('settings-loaded', (event: { data: TimoSettings }) => {
     if (!event.data) return
     displayPriority.value = (event.data.displayPriority ?? defaultSettings().displayPriority) as string[]
-    idleDisplay.value = (event.data.idleDisplay as any) || defaultSettings().idleDisplay
-    theme.value = (event.data.theme as any) || defaultSettings().theme
-    // New fields with defaults
+    idleDisplay.value = isValidIdleDisplay(event.data.idleDisplay)
+      ? event.data.idleDisplay
+      : defaultSettings().idleDisplay as 'all' | 'cpu' | 'mem' | 'net' | 'none'
+    theme.value = isValidTheme(event.data.theme)
+      ? event.data.theme
+      : defaultSettings().theme as 'dark' | 'light' | 'frosted'
     showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true
     showToolProgress.value = event.data.showToolProgress !== undefined ? event.data.showToolProgress : true
     showSubagentDetails.value = event.data.showSubagentDetails !== undefined ? event.data.showSubagentDetails : true
-    netUnit.value = (event.data.netUnit as any) || defaultSettings().netUnit
+    netUnit.value = (isValidNetUnit(event.data.netUnit ?? '')
+      ? event.data.netUnit!
+      : defaultSettings().netUnit) as 'auto' | 'kb' | 'mb'
     loaded.value = true
     applyTheme(theme.value)
   })
@@ -81,12 +100,18 @@ export const useSettingsStore = defineStore('settings', () => {
   Events.On('settings-updated', (event: { data: TimoSettings | null }) => {
     if (!event.data) return
     displayPriority.value = (event.data.displayPriority ?? defaultSettings().displayPriority) as string[]
-    idleDisplay.value = (event.data.idleDisplay as any) || defaultSettings().idleDisplay
-    theme.value = (event.data.theme as any) || defaultSettings().theme
+    idleDisplay.value = isValidIdleDisplay(event.data.idleDisplay)
+      ? event.data.idleDisplay
+      : defaultSettings().idleDisplay as 'all' | 'cpu' | 'mem' | 'net' | 'none'
+    theme.value = isValidTheme(event.data.theme)
+      ? event.data.theme
+      : defaultSettings().theme as 'dark' | 'light' | 'frosted'
     showToolContext.value = event.data.showToolContext !== undefined ? event.data.showToolContext : true
     showToolProgress.value = event.data.showToolProgress !== undefined ? event.data.showToolProgress : true
     showSubagentDetails.value = event.data.showSubagentDetails !== undefined ? event.data.showSubagentDetails : true
-    netUnit.value = (event.data.netUnit as any) || defaultSettings().netUnit
+    netUnit.value = (isValidNetUnit(event.data.netUnit ?? '')
+      ? event.data.netUnit!
+      : defaultSettings().netUnit) as 'auto' | 'kb' | 'mb'
     applyTheme(theme.value)
   })
 

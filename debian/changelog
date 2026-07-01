@@ -1,3 +1,18 @@
+timo (0.3.0-1) unstable; urgency=medium
+
+  * 修复 findPlayer() 优先选正在播放的 MPRIS 播放器
+  * 修复 lastPlayer 不再播放时自动切换到新的播放器
+  * 修复 mpris:length 单位自动检测（兼容毫秒/微秒）
+  * 前端 hasMedia 增加 info.playing 检查（无元数据时也能检测）
+  * Position 不可用时显示总时长而非 -0:00
+  * 重构 notification.ts handle() 拆分为 12 个聚焦函数
+  * 移除未使用的 CoverBase64 字段
+  * 前端类型安全加固（替换 as any 为类型守卫函数）
+  * 清理 SettingsPanel 未使用的计时器数组
+  * NotchBar netUnit 设置生效
+
+ -- cn-maul <your-email@example.com>  Wed, 01 Jul 2025 00:00:00 +0800
+
 timo (0.2.0-1) unstable; urgency=medium
 
   * 架构重构: hooks_shared.go 统一管理 hook 配置

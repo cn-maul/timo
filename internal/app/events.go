@@ -104,4 +104,11 @@ func registerAllEventHandlers(
 		status := getHooksStatus()
 		app.Event.Emit("hooks-status", status)
 	})
+
+	// Approval response from the notch UI — focus the AI terminal window
+	// so the user can quickly type their answer after clicking ✅/❌.
+	app.Event.On("approve-response", func(event *application.CustomEvent) {
+		response, _ := event.Data.(string)
+		focusAITerminal(response)
+	})
 }

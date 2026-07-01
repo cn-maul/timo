@@ -34,6 +34,9 @@ const needsScrolling = computed(() => titleText.value.length > 20)
 
 const remainingText = computed(() => {
   if (media.durationMs <= 0) return ''
+  // Some players (Deepin Music) don't report position.
+  // Show total duration instead of misleading remaining time.
+  if (media.positionMs <= 0 && media.playing) return formatTime(media.durationMs)
   const remain = Math.max(0, media.durationMs - media.positionMs)
   return `-${formatTime(remain)}`
 })
@@ -59,12 +62,18 @@ const memText = computed(() => {
 
 const netDownText = computed(() => {
   const v = sys.netDownKBps
+  if (settings.netUnit === 'kb') return `${Math.round(v)}K`
+  if (settings.netUnit === 'mb') return `${(v / 1024).toFixed(1)}M`
+  // auto
   if (v < 1024) return `${Math.round(v)}K`
   return `${(v / 1024).toFixed(1)}M`
 })
 
 const netUpText = computed(() => {
   const v = sys.netUpKBps
+  if (settings.netUnit === 'kb') return `${Math.round(v)}K`
+  if (settings.netUnit === 'mb') return `${(v / 1024).toFixed(1)}M`
+  // auto
   if (v < 1024) return `${Math.round(v)}K`
   return `${(v / 1024).toFixed(1)}M`
 })
@@ -167,9 +176,9 @@ const props = defineProps<{
             <span class="claude-text claude-tool" v-if="showToolLine">
               {{ aiSecondaryText }}
             </span>
-            <!-- Attention state -->
-            <span class="claude-text" v-else-if="notif.state === 'attention'">
-              ⚠️ {{ notif.message || '需要关注' }}
+            <!-- Attention state: show approval question + buttons -->
+            <span class="claude-text" v-if="notif.state === 'attention'">
+              ❓ {{ notif.message || '需要关注' }}
             </span>
             <!-- Done state -->
             <span class="claude-text" v-else-if="notif.state === 'done'">
@@ -185,12 +194,17 @@ const props = defineProps<{
         <div class="notch-right">
           <span class="claude-timer" v-if="notif.state === 'running'">{{ notif.elapsedText }}</span>
           <span class="tool-count" v-if="showToolCount">{{ notif.toolCount }}</span>
+          <!-- Approval buttons: show instead of traffic light when attention -->
+          <template v-if="notif.state === 'attention'">
+            <button class="approve-btn approve-yes" aria-label="同意" @click.stop="notif.approve()">✓</button>
+            <button class="approve-btn approve-no" aria-label="拒绝" @click.stop="notif.reject()">✗</button>
+          </template>
           <span
+            v-else
             class="traffic-light"
             :class="{
               'light-green': notif.state === 'running',
-              'light-yellow': notif.state === 'attention',
-              'light-red': notif.state === 'done',
+              'light-yellow': notif.state === 'done',
             }"
           />
         </div>
@@ -316,5 +330,48 @@ const props = defineProps<{
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Approval buttons in notch bar */
+.approve-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.1s, opacity 0.15s;
+}
+
+.approve-btn:active {
+  transform: scale(0.9);
+}
+
+.approve-btn:focus-visible {
+  outline: 2px solid var(--timo-green, #22c55e);
+  outline-offset: 2px;
+}
+
+.approve-yes {
+  background: var(--timo-approve-yes-bg);
+  color: var(--timo-green);
+}
+
+.approve-yes:hover {
+  background: var(--timo-approve-yes-hover);
+}
+
+.approve-no {
+  background: var(--timo-approve-no-bg);
+  color: var(--timo-red);
+}
+
+.approve-no:hover {
+  background: var(--timo-approve-no-hover);
 }
 </style>
